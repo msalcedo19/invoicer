@@ -1,29 +1,7 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 
-from database import Base
-
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    is_active = Column(Boolean, default=True)
-
-    items = relationship("Item", back_populates="owner")
-
-
-class Item(Base):
-    __tablename__ = "items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)
-    description = Column(String, index=True)
-    owner_id = Column(Integer, ForeignKey("users.id"))
-
-    owner = relationship("User", back_populates="items")
+from ms_invoicer.sql_app.database import Base
 
 
 class Customer(Base):
@@ -34,10 +12,9 @@ class Customer(Base):
     tax1 = Column(Integer)
     tax2 = Column(Integer)
     price_unit = Column(Integer)
-    top_info_id = Column(Integer, ForeignKey("topinfos.id"))
 
     invoices = relationship("Invoice", back_populates="customer")
-    top_info = relationship("TopInfo", back_populates="customer")
+    top_info = relationship("TopInfo", back_populates="customer", uselist=False)
 
 
 class Invoice(Base):
@@ -53,10 +30,9 @@ class Invoice(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"))
 
     customer = relationship("Customer", back_populates="invoices")
-    bill_to = relationship("BillTo", back_populates="invoices")
-    services = relationship("Service", back_populates="services")
-    top_info = relationship("TopInfo", back_populates="topinfos")
-    file = relationship("TopInfo", back_populates="topinfos")
+    bill_to = relationship("BillTo", back_populates="invoice")
+    services = relationship("Service", back_populates="invoice")
+    file = relationship("File", back_populates="invoice")
 
 
 class BillTo(Base):
@@ -68,7 +44,7 @@ class BillTo(Base):
     phone = Column(String)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
 
-    invoices = relationship("Invoice", back_populates="bill_to")
+    invoice = relationship("Invoice", back_populates="bill_to")
 
 class Service(Base):
     __tablename__ = "services"
@@ -79,6 +55,9 @@ class Service(Base):
     currency = Column(String)
     hours = Column(Integer)
     price_unit = Column(Integer)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"))
+
+    invoice = relationship("Invoice", back_populates="services")
 
 
 class TopInfo(Base):
@@ -87,6 +66,7 @@ class TopInfo(Base):
     id = Column(Integer, primary_key=True, index=True)
     addr = Column(String)
     phone = Column(String)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
 
     customer = relationship("Customer", back_populates="top_info")
 
@@ -95,5 +75,8 @@ class File(Base):
     __tablename__ = "files"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String)
+    url = Column(String)
     created = Column(DateTime)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"))
+
+    invoice = relationship("Invoice", back_populates="file")
