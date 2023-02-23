@@ -76,6 +76,7 @@ class File(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String)
+    url_new = Column(String)
     created = Column(DateTime)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
 

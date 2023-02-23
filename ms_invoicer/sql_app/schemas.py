@@ -61,6 +61,7 @@ class TopInfo(TopInfoBase):
 
 class FileBase(BaseModel):
     url: str
+    url_new: str
     created: datetime
 
 

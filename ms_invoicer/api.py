@@ -1,6 +1,7 @@
+from typing import Union
 import logging
 from ms_invoicer.config import LOG_LEVEL
-from fastapi import Depends, FastAPI, UploadFile
+from fastapi import Depends, FastAPI, UploadFile, status
 from sqlalchemy.orm import Session
 from ms_invoicer.sql_app import crud, schemas, models
 from ms_invoicer.file_helpers import process_file, save_file
@@ -15,14 +16,38 @@ register_event_handlers()
 
 
 @api.get("/")
-def status():
+def api_status():
     """Returns a detailed status of the service including all dependencies"""
     # TODO: Should replace this with database connection / service checks
     return {"status": "OK"}
 
 
+@api.get("/customer/", response_model=list[schemas.Customer])
+def get_customers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_customers(db=db, skip=skip, limit=limit)
+
+
+@api.get("/customer/{model_id}", response_model=Union[schemas.Customer, None])
+def get_customer(model_id: int, db: Session = Depends(get_db)):
+    return crud.get_customer(db=db, model_id=model_id)
+
+
+@api.patch("/customer/{model_id}", response_model=Union[schemas.Customer, None])
+def patch_customer(model_update: dict, model_id: int, db: Session = Depends(get_db)):
+    result = crud.patch_customer(db=db, model_id=model_id, update_dict=model_update)
+    if result:
+        return crud.get_customer(db=db, model_id=model_id)
+    else:
+        return None
+
+
+@api.delete("/customer/{model_id}", status_code=status.HTTP_200_OK)
+def delete_customer(model_id: int, db: Session = Depends(get_db)):
+    return crud.delete_customer(db=db, model_id=model_id)
+
+
 @api.post("/customer/", response_model=schemas.Customer)
-def create_user(customer: schemas.CustomerCreate, db: Session = Depends(get_db)):
+def post_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_db)):
     return crud.create_customer(db=db, model=customer)
 
 

@@ -74,6 +74,7 @@ def upgrade() -> None:
         File.__tablename__,
         sa.Column('id', sa.Integer, primary_key=True),
         sa.Column('url', sa.String(128), nullable=False),
+        sa.Column('url_new', sa.String(128), nullable=False),
         sa.Column('created', sa.DateTime, nullable=False),
         sa.Column('invoice_id', sa.Integer, nullable=True),
     )
