@@ -8,3 +8,8 @@ class FilesToProcessEvent(Event):
 
     def __init__(self, files_to_process: List[Dict[str, Any]]):
         self.files_to_process = files_to_process
+
+class InvoiceToProcessEvent(Event):
+    """
+    TODO: Add description
+    """

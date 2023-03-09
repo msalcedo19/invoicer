@@ -59,7 +59,7 @@ async def process_file(file_path: str, output_path: str, col_letter: str = "G") 
 
         output_wb_obj.save(output_path)
         await publish(FilesToProcessEvent(files_to_process=[output_path]))
-        return schemas.FileCreate(**{"url": output_path, "created": datetime.now()})
+        return schemas.FileCreate(**{"s3_xlsx_url": file_path, "s3_pdf_url": output_path, "created": datetime.now()})
     except Exception as e:
         log.error("File processing failed")
         log.error(e)

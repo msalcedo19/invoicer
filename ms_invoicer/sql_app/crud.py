@@ -104,19 +104,19 @@ def create_service(db: Session, model: schemas.ServiceCreate):
     return db_model
 
 # Invoice
-def get_service(db: Session, model_id: int):
+def get_invoice(db: Session, model_id: int):
     return db.query(models.Invoice).filter(models.Invoice.id == model_id).first()
 
 
-def get_services(db: Session, skip: int = 0, limit: int = 100):
+def get_invoices(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Invoice).offset(skip).limit(limit).all()
 
 
-def patch_service(db: Session, model_id: int, update_dict: dict):
+def patch_invoice(db: Session, model_id: int, update_dict: dict):
     return db.query(models.Invoice).filter(models.Invoice.id == model_id).update(update_dict)
 
 
-def delete_service(db: Session, model_id: int):
+def delete_invoice(db: Session, model_id: int):
     return db.query(models.Invoice).filter(models.Invoice.id == model_id).delete()
 
 

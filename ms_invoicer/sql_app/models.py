@@ -29,8 +29,8 @@ class Invoice(Base):
     updated = Column(DateTime)
     customer_id = Column(Integer, ForeignKey("customers.id"))
 
-    customer = relationship("Customer", back_populates="invoices")
-    bill_to = relationship("BillTo", back_populates="invoice")
+    customer = relationship("Customer", back_populates="invoices", uselist=False)
+    bill_to = relationship("BillTo", back_populates="invoice", uselist=False)
     services = relationship("Service", back_populates="invoice")
     file = relationship("File", back_populates="invoice")
 
@@ -75,8 +75,8 @@ class File(Base):
     __tablename__ = "files"
 
     id = Column(Integer, primary_key=True, index=True)
-    url = Column(String)
-    url_new = Column(String)
+    s3_xlsx_url = Column(String)
+    s3_pdf_url = Column(String)
     created = Column(DateTime)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
 

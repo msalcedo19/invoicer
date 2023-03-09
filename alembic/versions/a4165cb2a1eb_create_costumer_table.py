@@ -73,8 +73,8 @@ def upgrade() -> None:
     op.create_table(
         File.__tablename__,
         sa.Column('id', sa.Integer, primary_key=True),
-        sa.Column('url', sa.String(128), nullable=False),
-        sa.Column('url_new', sa.String(128), nullable=False),
+        sa.Column('s3_xlsx_url', sa.String(256), nullable=False),
+        sa.Column('s3_pdf_url', sa.String(256), nullable=False),
         sa.Column('created', sa.DateTime, nullable=False),
         sa.Column('invoice_id', sa.Integer, nullable=True),
     )

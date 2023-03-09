@@ -2,18 +2,32 @@ from typing import Union
 import logging
 from ms_invoicer.config import LOG_LEVEL
 from fastapi import Depends, FastAPI, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from ms_invoicer.sql_app import crud, schemas, models
 from ms_invoicer.file_helpers import process_file, save_file
 from ms_invoicer.event_handler import register_event_handlers
 from ms_invoicer.db_pool import get_db
+from ms_invoicer.invoice_helper import build_pdf
 
 api = FastAPI()
+api.add_middleware(
+    CORSMiddleware,
+    allow_credentials=False,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 logging.basicConfig(format="[%(asctime)s] %(levelname)-8s - %(message)s", level=LOG_LEVEL)
 log = logging.getLogger(__name__)
 
 register_event_handlers()
 
+
+@api.get("/test")
+def test(db: Session = Depends(get_db)):
+    build_pdf(html_name="template01.html", pdf_name="invoice01.pdf", invoice=crud.get_invoice(db=db, model_id=6))
+    return {"status": "OK"}
 
 @api.get("/")
 def api_status():
@@ -51,7 +65,12 @@ def post_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_db
     return crud.create_customer(db=db, model=customer)
 
 
-@api.post("/file/")
+@api.post("/invoice/", response_model=schemas.Invoice)
+def post_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)):
+    return crud.create_invoice(db=db, model=invoice)
+
+
+@api.post("/upload_file/", response_model=schemas.File)
 async def create_upload_file(file: UploadFile, db: Session = Depends(get_db)):
     file_path = 'temp/' + file.filename
     output_path = 'temp/new {}'.format(file.filename)

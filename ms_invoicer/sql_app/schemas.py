@@ -60,8 +60,8 @@ class TopInfo(TopInfoBase):
 
 
 class FileBase(BaseModel):
-    url: str
-    url_new: str
+    s3_xlsx_url: str
+    s3_pdf_url: str
     created: datetime
 
 
@@ -71,7 +71,7 @@ class FileCreate(FileBase):
 
 class File(FileBase):
     id: int
-    invoice_id: int
+    invoice_id: Union[int, None] = None
 
     class Config:
         orm_mode = True
@@ -84,6 +84,7 @@ class InvoiceBase(BaseModel):
     total: int
     created: datetime
     updated: datetime
+    customer_id: int
 
 
 class InvoiceCreate(InvoiceBase):
@@ -92,9 +93,8 @@ class InvoiceCreate(InvoiceBase):
 
 class Invoice(InvoiceBase):
     id: int
-    customer_id: int
-    bill_to: BillTo = None
-    file: File = None
+    bill_to: Union[BillTo, None] = None
+    file: Union[File, None] = None
     services: list[Service] = []
 
     class Config:
