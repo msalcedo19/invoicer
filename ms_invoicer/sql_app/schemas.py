@@ -3,12 +3,30 @@ from typing import Union
 from pydantic import BaseModel
 
 
+class GlobalBase(BaseModel):
+    name: str
+    value: str
+    created: datetime
+
+
+class GlobalCreate(GlobalBase):
+    pass
+
+
+class Global(GlobalBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 class ServiceBase(BaseModel):
     title: str
     amount: int
     currency: str
     hours: int
     price_unit: int
+    invoice_id: int
 
 
 class ServiceCreate(ServiceBase):
@@ -17,7 +35,6 @@ class ServiceCreate(ServiceBase):
 
 class Service(ServiceBase):
     id: int
-    invoice_id: Union[int, None]
 
     class Config:
         orm_mode = True
@@ -61,27 +78,37 @@ class TopInfo(TopInfoBase):
 
 class FileBase(BaseModel):
     s3_xlsx_url: str
-    s3_pdf_url: str
+    s3_pdf_url: Union[str , None]
     created: datetime
+    invoice_id: int
 
 
 class FileCreate(FileBase):
     pass
 
 
-class File(FileBase):
+class CustomerBase(BaseModel):
+    name: str
+    price_unit: int
+
+
+class CustomerCreate(CustomerBase):
+    pass
+
+
+class Customer(CustomerBase):
     id: int
-    invoice_id: Union[int, None] = None
+    top_info: Union[TopInfo, None] = None
 
     class Config:
         orm_mode = True
 
 
 class InvoiceBase(BaseModel):
-    number: int
     reason: str
-    subtotal: int
-    total: int
+    subtotal: int # TODO: Verificar si es necesario vs total...
+    tax_1: int
+    tax_2: int
     created: datetime
     updated: datetime
     customer_id: int
@@ -94,28 +121,15 @@ class InvoiceCreate(InvoiceBase):
 class Invoice(InvoiceBase):
     id: int
     bill_to: Union[BillTo, None] = None
-    file: Union[File, None] = None
     services: list[Service] = []
+    customer: Customer
 
     class Config:
         orm_mode = True
 
-
-class CustomerBase(BaseModel):
-    name: str
-    tax1: int
-    tax2: int
-    price_unit: int
-
-
-class CustomerCreate(CustomerBase):
-    pass
-
-
-class Customer(CustomerBase):
+class File(FileBase):
     id: int
-    top_info: Union[TopInfo, None] = None
-    invoices: list[Invoice] = []
+    invoice: Invoice
 
     class Config:
         orm_mode = True

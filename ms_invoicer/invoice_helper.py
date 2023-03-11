@@ -59,9 +59,16 @@ def build_pdf(
             service_data["per_hour"] = service.price_unit
             service_data["amount"] = service.amount
 
+        total_tax_1 = invoice.tax_1 * invoice.subtotal
+        total_tax_2 = invoice.tax_2 * invoice.subtotal
+        total = total_tax_1 + total_tax_2 + invoice.subtotal
         context = {
             "invoice_id": invoice.id,
             "created": invoice.created,
+            "total_no_taxes": invoice.subtotal,
+            "total_tax1": total_tax_1 ,
+            "total_tax2": total_tax_2,
+            "total": total
         }
         context |= bill_to_data
         context |= service_data

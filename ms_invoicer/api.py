@@ -1,7 +1,7 @@
 from typing import Union
 import logging
 from ms_invoicer.config import LOG_LEVEL
-from fastapi import Depends, FastAPI, UploadFile, status
+from fastapi import Depends, FastAPI, UploadFile, status, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from ms_invoicer.sql_app import crud, schemas, models
@@ -34,6 +34,11 @@ def api_status():
     """Returns a detailed status of the service including all dependencies"""
     # TODO: Should replace this with database connection / service checks
     return {"status": "OK"}
+
+
+@api.get("/global/{global_name}", response_model=schemas.Global)
+def get_global(global_name: str, db: Session = Depends(get_db)):
+    return crud.get_global(db=db, global_name=global_name)
 
 
 @api.get("/customer/", response_model=list[schemas.Customer])
@@ -70,8 +75,26 @@ def post_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)):
     return crud.create_invoice(db=db, model=invoice)
 
 
+@api.get("/invoice/", response_model=list[schemas.Invoice])
+def get_invoices(db: Session = Depends(get_db)):
+    return crud.get_invoices(db=db)
+
+
+@api.get("/files/{invoice_id}", response_model=list[schemas.File])
+def get_files_by_invoice(invoice_id: int, db: Session = Depends(get_db)):
+    return crud.get_files_by_invoice(db=db, model_id=invoice_id)
+
+@api.get("/files/", response_model=list[schemas.File])
+def get_files(db: Session = Depends(get_db)):
+    return crud.get_files(db=db)
+
+@api.get("/invoice/{customer_id}", response_model=list[schemas.Invoice])
+def get_invoice_by_customer(customer_id: int, db: Session = Depends(get_db)):
+    return crud.get_invoice_by_customer(db=db, model_id=customer_id)
+
+
 @api.post("/upload_file/", response_model=schemas.File)
-async def create_upload_file(file: UploadFile, db: Session = Depends(get_db)):
+async def create_upload_file(invoice_id: str = Form(), file: UploadFile = Form(), db: Session = Depends(get_db)):
     file_path = 'temp/' + file.filename
     output_path = 'temp/new {}'.format(file.filename)
 
@@ -79,7 +102,7 @@ async def create_upload_file(file: UploadFile, db: Session = Depends(get_db)):
     file.file.seek(0)
     save_file(output_path, file)
 
-    file_created = await process_file(file_path, output_path)
+    file_created = await process_file(file_path, output_path, int(invoice_id))
     return crud.create_file(db=db, model=file_created)
 
 

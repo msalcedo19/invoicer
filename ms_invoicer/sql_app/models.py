@@ -9,8 +9,6 @@ class Customer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    tax1 = Column(Integer)
-    tax2 = Column(Integer)
     price_unit = Column(Integer)
 
     invoices = relationship("Invoice", back_populates="customer")
@@ -21,10 +19,10 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)
-    number = Column(Integer, index=True)
     reason = Column(String)
     subtotal = Column(Integer)
-    total = Column(Integer)
+    tax_1 = Column(Integer)
+    tax_2 = Column(Integer)
     created = Column(DateTime)
     updated = Column(DateTime)
     customer_id = Column(Integer, ForeignKey("customers.id"))
@@ -32,7 +30,7 @@ class Invoice(Base):
     customer = relationship("Customer", back_populates="invoices", uselist=False)
     bill_to = relationship("BillTo", back_populates="invoice", uselist=False)
     services = relationship("Service", back_populates="invoice")
-    file = relationship("File", back_populates="invoice")
+    file = relationship("File", back_populates="invoice", uselist=False)
 
 
 class BillTo(Base):
@@ -80,4 +78,13 @@ class File(Base):
     created = Column(DateTime)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
 
-    invoice = relationship("Invoice", back_populates="file")
+    invoice = relationship("Invoice", back_populates="file", uselist=False)
+
+
+class Globals(Base):
+    __tablename__ = "global"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    value = Column(String)
+    created = Column(DateTime)

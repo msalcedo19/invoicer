@@ -2,6 +2,12 @@ from sqlalchemy.orm import Session
 
 from ms_invoicer.sql_app import models, schemas
 
+
+# Customer
+def get_global(db: Session, global_name: str):
+    return db.query(models.Globals).filter(models.Globals.name == global_name).first()
+
+
 # Customer
 def get_customer(db: Session, model_id: int):
     return db.query(models.Customer).filter(models.Customer.id == model_id).first()
@@ -32,6 +38,8 @@ def create_customer(db: Session, model: schemas.CustomerCreate):
 def get_file(db: Session, model_id: int):
     return db.query(models.File).filter(models.File.id == model_id).first()
 
+def get_files_by_invoice(db: Session, model_id: int):
+    return db.query(models.File).filter(models.File.invoice_id == model_id).all()
 
 def get_files(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.File).offset(skip).limit(limit).all()
@@ -106,6 +114,10 @@ def create_service(db: Session, model: schemas.ServiceCreate):
 # Invoice
 def get_invoice(db: Session, model_id: int):
     return db.query(models.Invoice).filter(models.Invoice.id == model_id).first()
+
+
+def get_invoice_by_customer(db: Session, model_id: int):
+    return db.query(models.Invoice).filter(models.Invoice.customer_id == model_id).all()
 
 
 def get_invoices(db: Session, skip: int = 0, limit: int = 100):
