@@ -52,7 +52,6 @@ def upgrade() -> None:
         Invoice.__tablename__,
         sa.Column("id", sa.Integer, primary_key=True),
         sa.Column("reason", sa.String(50), nullable=False),
-        sa.Column("subtotal", sa.Integer, nullable=False),
         sa.Column("tax_1", sa.Integer, nullable=False),
         sa.Column("tax_2", sa.Integer, nullable=False),
         sa.Column("created", sa.DateTime, nullable=False),
@@ -83,23 +82,6 @@ def upgrade() -> None:
         ["id"],
     )
 
-    op.create_table(
-        Service.__tablename__,
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("title", sa.String(64), nullable=False),
-        sa.Column("amount", sa.Integer, nullable=False),
-        sa.Column("currency", sa.String(32), nullable=False),
-        sa.Column("hours", sa.Integer, nullable=False),
-        sa.Column("price_unit", sa.Integer, nullable=False),
-        sa.Column("invoice_id", sa.Integer, nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_invoice_id",
-        Service.__tablename__,
-        Invoice.__tablename__,
-        ["invoice_id"],
-        ["id"],
-    )
 
     op.create_table(
         File.__tablename__,
@@ -114,6 +96,24 @@ def upgrade() -> None:
         File.__tablename__,
         Invoice.__tablename__,
         ["invoice_id"],
+        ["id"],
+    )
+
+    op.create_table(
+        Service.__tablename__,
+        sa.Column("id", sa.Integer, primary_key=True),
+        sa.Column("title", sa.String(64), nullable=False),
+        sa.Column("amount", sa.Integer, nullable=False),
+        sa.Column("currency", sa.String(32), nullable=False),
+        sa.Column("hours", sa.Integer, nullable=False),
+        sa.Column("price_unit", sa.Integer, nullable=False),
+        sa.Column("file_id", sa.Integer, nullable=True),
+    )
+    op.create_foreign_key(
+        "fk_file_id",
+        Service.__tablename__,
+        File.__tablename__,
+        ["file_id"],
         ["id"],
     )
 
@@ -135,8 +135,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table(Globals.__tablename__)
-    op.drop_table(File.__tablename__)
     op.drop_table(Service.__tablename__)
+    op.drop_table(File.__tablename__)
     op.drop_table(BillTo.__tablename__)
     op.drop_table(Invoice.__tablename__)
     op.drop_table(TopInfo.__tablename__)

@@ -8,3 +8,4 @@ openpyxl
 beautifulsoup4
 pdfkit
 jinja2
+boto3

@@ -20,7 +20,6 @@ class Invoice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     reason = Column(String)
-    subtotal = Column(Integer)
     tax_1 = Column(Integer)
     tax_2 = Column(Integer)
     created = Column(DateTime)
@@ -29,8 +28,7 @@ class Invoice(Base):
 
     customer = relationship("Customer", back_populates="invoices", uselist=False)
     bill_to = relationship("BillTo", back_populates="invoice", uselist=False)
-    services = relationship("Service", back_populates="invoice")
-    file = relationship("File", back_populates="invoice", uselist=False)
+    files = relationship("File", back_populates="invoice")
 
 
 class BillTo(Base):
@@ -53,9 +51,9 @@ class Service(Base):
     currency = Column(String)
     hours = Column(Integer)
     price_unit = Column(Integer)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"))
+    file_id = Column(Integer, ForeignKey("files.id"))
 
-    invoice = relationship("Invoice", back_populates="services")
+    file = relationship("File", back_populates="services", uselist=False)
 
 
 class TopInfo(Base):
@@ -78,7 +76,8 @@ class File(Base):
     created = Column(DateTime)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
 
-    invoice = relationship("Invoice", back_populates="file", uselist=False)
+    services = relationship("Service", back_populates="file")
+    invoice = relationship("Invoice", back_populates="files", uselist=False)
 
 
 class Globals(Base):

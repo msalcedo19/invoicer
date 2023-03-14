@@ -45,8 +45,14 @@ def get_files(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.File).offset(skip).limit(limit).all()
 
 
+def get_files_by_invoice(db: Session, model_id: int):
+    return db.query(models.File).filter(models.File.invoice_id == model_id).all()
+
+
 def patch_file(db: Session, model_id: int, update_dict: dict):
-    return db.query(models.File).filter(models.File.id == model_id).update(update_dict)
+    result = db.query(models.File).filter(models.File.id == model_id).update(update_dict)
+    db.commit()
+    return result
 
 
 def delete_file(db: Session, model_id: int):
@@ -54,6 +60,10 @@ def delete_file(db: Session, model_id: int):
     db.delete(result)
     db.commit()
     return len(result)
+
+
+def delete_file_by_invoice(db: Session, model_id: int):
+    return db.query(models.File).filter(models.File.invoice_id == model_id).delete()
 
 
 def create_file(db: Session, model: schemas.FileCreate):
@@ -100,6 +110,10 @@ def patch_service(db: Session, model_id: int, update_dict: dict):
     return db.query(models.Service).filter(models.Service.id == model_id).update(update_dict)
 
 
+def delete_service_by_file(db: Session, model_id: int):
+    return db.query(models.Service).filter(models.Service.file_id == model_id).delete()
+
+
 def delete_service(db: Session, model_id: int):
     return db.query(models.Service).filter(models.Service.id == model_id).delete()
 
@@ -129,7 +143,13 @@ def patch_invoice(db: Session, model_id: int, update_dict: dict):
 
 
 def delete_invoice(db: Session, model_id: int):
-    return db.query(models.Invoice).filter(models.Invoice.id == model_id).delete()
+    result = db.query(models.Invoice).filter(models.Invoice.id == model_id).first()
+    db.delete(result)
+    db.commit()
+
+
+def delete_invoices_by_customer(db: Session, model_id: int):
+    return db.query(models.Invoice).filter(models.Invoice.customer_id == model_id).delete()
 
 
 def create_invoice(db: Session, model: schemas.InvoiceCreate):

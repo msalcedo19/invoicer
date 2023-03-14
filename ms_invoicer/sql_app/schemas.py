@@ -26,7 +26,7 @@ class ServiceBase(BaseModel):
     currency: str
     hours: int
     price_unit: int
-    invoice_id: int
+    file_id: int
 
 
 class ServiceCreate(ServiceBase):
@@ -106,7 +106,6 @@ class Customer(CustomerBase):
 
 class InvoiceBase(BaseModel):
     reason: str
-    subtotal: int # TODO: Verificar si es necesario vs total...
     tax_1: int
     tax_2: int
     created: datetime
@@ -121,7 +120,6 @@ class InvoiceCreate(InvoiceBase):
 class Invoice(InvoiceBase):
     id: int
     bill_to: Union[BillTo, None] = None
-    services: list[Service] = []
     customer: Customer
 
     class Config:
@@ -130,6 +128,7 @@ class Invoice(InvoiceBase):
 class File(FileBase):
     id: int
     invoice: Invoice
+    services: list[Service] = []
 
     class Config:
         orm_mode = True

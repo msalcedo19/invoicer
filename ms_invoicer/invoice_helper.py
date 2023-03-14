@@ -4,28 +4,32 @@ import os
 import bs4
 import jinja2
 import pdfkit
-from ms_invoicer.sql_app import crud, schemas, models
+from ms_invoicer.file_helpers import upload_file
+from ms_invoicer.dao import PdfToProcessEvent
+from ms_invoicer.sql_app import crud
+from ms_invoicer.db_pool import get_db
+
+from uuid import uuid4
 
 base = os.path.dirname(os.path.dirname(__file__))
 
 
-def build_pdf(
-    html_name: str,
-    pdf_name: str,
-    invoice: schemas.Invoice
-):
-    assert html_name.endswith(".html")
-    assert pdf_name.endswith(".pdf")
-    assert invoice.bill_to is not None
-    assert len(invoice.services) != 0
+def build_pdf(event: PdfToProcessEvent):
+    assert event.html_template_name.endswith(".html")
+    # assert event.invoice.bill_to is not None TODO:  Especificar comportamiento con el cliente
+    assert len(event.file.services) != 0
 
-    input_html_path: str = os.path.join(base, "templates/base/{}".format(html_name))
-    output_html_path: str = os.path.join(base, "templates/{}".format(html_name))
+    input_html_path: str = os.path.join(
+        base, "templates/base/{}".format(event.html_template_name)
+    )
+    output_html_path: str = os.path.join(
+        base, "templates/{}".format(event.html_template_name)
+    )
     with open(input_html_path) as fp:
         soup = BeautifulSoup(fp, "html.parser")
 
         new_tag = soup.new_tag("div")
-        for index in range(0, len(invoice.services)):
+        for index in range(0, len(event.file.services)):
             new_tr_tag = soup.new_tag("tr")
             for variable in [
                 "service_id",
@@ -46,29 +50,36 @@ def build_pdf(
             file.write(str(soup))
 
         bill_to_data = {}
-        if invoice.bill_to:
-            bill_to_data["to"] = invoice.bill_to.to
-            bill_to_data["addr"] = invoice.bill_to.addr
-            bill_to_data["phone"] = invoice.bill_to.phone
+        if event.invoice.bill_to:
+            """bill_to_data["to"] = event.invoice.bill_to.to
+            bill_to_data["addr"] = event.invoice.bill_to.addr
+            bill_to_data["phone"] = event.invoice.bill_to.phone"""
+        bill_to_data["to"] = "Sparksuite, Inc."
+        bill_to_data["addr"] = "12345 Sunny Road Sunnyville, CA 12345"
+        bill_to_data["phone"] = "1234567890"
 
         service_data = {}
-        for service in invoice.services:
-            service_data["service_id"] = service.id
-            service_data["service_txt"] = service.title
-            service_data["num_hours"] = service.hours
-            service_data["per_hour"] = service.price_unit
-            service_data["amount"] = service.amount
+        subtotal = 0
+        index = 0
+        for service in event.file.services:
+            service_data["service_id{}".format(index)] = index+1
+            service_data["service_txt{}".format(index)] = service.title
+            service_data["num_hours{}".format(index)] = service.hours
+            service_data["per_hour{}".format(index)] = service.price_unit
+            service_data["amount{}".format(index)] = service.amount
+            subtotal += service.hours * service.price_unit
+            index += 1
 
-        total_tax_1 = invoice.tax_1 * invoice.subtotal
-        total_tax_2 = invoice.tax_2 * invoice.subtotal
-        total = total_tax_1 + total_tax_2 + invoice.subtotal
+        total_tax_1 = (event.invoice.tax_1/100) * subtotal
+        total_tax_2 = (event.invoice.tax_2/100) * subtotal
+        total = total_tax_1 + total_tax_2 + subtotal
         context = {
-            "invoice_id": invoice.id,
-            "created": invoice.created,
-            "total_no_taxes": invoice.subtotal,
-            "total_tax1": total_tax_1 ,
+            "invoice_id": event.invoice.id,
+            "created": event.invoice.created,
+            "total_no_taxes": subtotal,
+            "total_tax1": total_tax_1,
             "total_tax2": total_tax_2,
-            "total": total
+            "total": total,
         }
         context |= bill_to_data
         context |= service_data
@@ -76,10 +87,19 @@ def build_pdf(
         template_loader = jinja2.FileSystemLoader(os.path.join(base, "templates"))
         template_env = jinja2.Environment(loader=template_loader)
 
-        template = template_env.get_template(html_name)
+        template = template_env.get_template(event.html_template_name)
         output_text = template.render(context)
-        
-        output_pdf_path: str = os.path.join(base, "temp/pdf/{}".format(pdf_name))
+
+        date_now = datetime.now()
+        filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
+        output_pdf_path: str = "temp/pdf/{}".format(filename)
         config = pdfkit.configuration(wkhtmltopdf="/usr/local/bin/wkhtmltopdf")
         pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
+        s3_pdf_url = upload_file(file_path=output_pdf_path, file_name=filename)
+        crud.patch_file(
+            db=next(get_db()),
+            model_id=event.file.id,
+            update_dict={"s3_pdf_url": s3_pdf_url},
+        )
+        return True
