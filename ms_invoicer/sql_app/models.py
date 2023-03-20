@@ -9,24 +9,35 @@ class Customer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    price_unit = Column(Integer)
 
-    invoices = relationship("Invoice", back_populates="customer")
-    top_info = relationship("TopInfo", back_populates="customer", uselist=False)
+    contracts = relationship("Contract")
+
+
+class Contract(Base):
+    __tablename__ = "contracts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    price_unit = Column(Integer)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+
+    invoices = relationship("Invoice", back_populates="contract")
 
 
 class Invoice(Base):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)
+    number_id = Column(Integer)
     reason = Column(String)
     tax_1 = Column(Integer)
     tax_2 = Column(Integer)
     created = Column(DateTime)
     updated = Column(DateTime)
-    customer_id = Column(Integer, ForeignKey("customers.id"))
+    contract_id = Column(Integer, ForeignKey("contracts.id"))
+    bill_to_id = Column(Integer, ForeignKey("billto.id"))
 
-    customer = relationship("Customer", back_populates="invoices", uselist=False)
+    contract = relationship("Contract", back_populates="invoices", uselist=False)
     bill_to = relationship("BillTo", back_populates="invoice", uselist=False)
     files = relationship("File", back_populates="invoice")
 
@@ -38,9 +49,10 @@ class BillTo(Base):
     to = Column(String)
     addr = Column(String)
     phone = Column(String)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"))
+    contract_id = Column(Integer, ForeignKey("contracts.id"))
 
     invoice = relationship("Invoice", back_populates="bill_to")
+
 
 class Service(Base):
     __tablename__ = "services"
@@ -62,9 +74,6 @@ class TopInfo(Base):
     id = Column(Integer, primary_key=True, index=True)
     addr = Column(String)
     phone = Column(String)
-    customer_id = Column(Integer, ForeignKey("customers.id"))
-
-    customer = relationship("Customer", back_populates="top_info")
 
 
 class File(Base):
@@ -77,7 +86,7 @@ class File(Base):
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
 
     services = relationship("Service", back_populates="file")
-    invoice = relationship("Invoice", back_populates="files", uselist=False)
+    invoice = relationship("Invoice", back_populates="files")
 
 
 class Globals(Base):

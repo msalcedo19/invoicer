@@ -9,7 +9,7 @@ from ms_invoicer.event_handler import register_event_handlers
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.invoice_helper import build_pdf
 from ms_invoicer.file_helpers import upload_file, process_file, save_file
-from ms_invoicer.routers import customer, invoice, files
+from ms_invoicer.routers import customer, invoice, files, contract
 
 api = FastAPI()
 api.add_middleware(
@@ -20,6 +20,7 @@ api.add_middleware(
     allow_headers=["*"]
 )
 api.include_router(customer.router, tags=["Customer"])
+api.include_router(contract.router, tags=["Contract"])
 api.include_router(invoice.router, tags=["Invoice"])
 api.include_router(files.router, tags=["Files"])
 
@@ -59,3 +60,8 @@ def get_services(db: Session = Depends(get_db)):
 @api.post("/bill_to/", response_model=schemas.BillTo)
 def create_bill_to(model: schemas.BillToCreate, db: Session = Depends(get_db)):
     return crud.create_billto(db=db, model=model)
+
+
+@api.get("/bill_to/", response_model=list[schemas.BillTo])
+def get_customers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_billtos(db=db, skip=skip, limit=limit)

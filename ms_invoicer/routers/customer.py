@@ -9,7 +9,7 @@ from ms_invoicer.db_pool import get_db
 router = APIRouter()
 
 
-@router.get("/customer/", response_model=list[schemas.Customer])
+@router.get("/customer/", response_model=list[schemas.CustomerLite])
 def get_customers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_customers(db=db, skip=skip, limit=limit)
 
@@ -28,18 +28,21 @@ def patch_customer(model_update: dict, model_id: int, db: Session = Depends(get_
         return None
 
 
-@router.delete("/customer/{model_id}", status_code=status.HTTP_200_OK)
-def delete_customer(model_id: int, db: Session = Depends(get_db)):
-    invoices = crud.get_invoice_by_customer(db=db, model_id=model_id)
-    for invoice in invoices:
-        files = crud.get_files_by_invoice(db=db, model_id=invoice.id)
-        for file in files:
-            crud.delete_service_by_file(db=db, model_id=file.id)
-        crud.delete_file_by_invoice(db=db, model_id=invoice.id)
-    crud.delete_invoices_by_customer(db=db, model_id=model_id)
-    return crud.delete_customer(db=db, model_id=model_id)
+@router.delete("/customer/{customer_id}", status_code=status.HTTP_200_OK)
+def delete_customer(customer_id: int, db: Session = Depends(get_db)):
+    contracts = crud.get_contracts_by_customer(db=db, model_id=customer_id)
+    for contract in contracts:
+        invoices = crud.get_invoices_by_contract(db=db, model_id=contract.id)
+        for invoice in invoices:
+            files = crud.get_files_by_invoice(db=db, model_id=invoice.id)
+            for file in files:
+                crud.delete_services_by_file(db=db, model_id=file.id)
+            crud.delete_files_by_invoice(db=db, model_id=invoice.id)
+        crud.delete_invoices_by_contract(db=db, model_id=contract.id)
+    crud.delete_contracts_by_customer(db=db, model_id=customer_id)
+    return crud.delete_customer(db=db, model_id=customer_id)
 
 
-@router.post("/customer/", response_model=schemas.Customer)
+@router.post("/customer/", response_model=schemas.CustomerLite)
 def post_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_db)):
     return crud.create_customer(db=db, model=customer)

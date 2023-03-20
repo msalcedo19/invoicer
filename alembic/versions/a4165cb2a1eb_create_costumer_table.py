@@ -10,6 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 from ms_invoicer.sql_app.models import (
     Customer,
+    Contract,
     Globals,
     TopInfo,
     Invoice,
@@ -30,7 +31,21 @@ def upgrade() -> None:
         Customer.__tablename__,
         sa.Column("id", sa.Integer, primary_key=True),
         sa.Column("name", sa.String(50), nullable=False),
-        sa.Column("price_unit", sa.Integer, nullable=False),
+    )
+
+    op.create_table(
+        Contract.__tablename__,
+        sa.Column("id", sa.Integer, primary_key=True),
+        sa.Column("name", sa.String(50), nullable=False),
+        sa.Column("price_unit", sa.Integer, nullable=True),
+        sa.Column("customer_id", sa.Integer, nullable=False),
+    )
+    op.create_foreign_key(
+        "fk_customer_id",
+        Contract.__tablename__,
+        Customer.__tablename__,
+        ["customer_id"],
+        ["id"],
     )
 
     op.create_table(
@@ -51,18 +66,20 @@ def upgrade() -> None:
     op.create_table(
         Invoice.__tablename__,
         sa.Column("id", sa.Integer, primary_key=True),
+        sa.Column("number_id", sa.Integer, nullable=False),
         sa.Column("reason", sa.String(50), nullable=False),
         sa.Column("tax_1", sa.Integer, nullable=False),
         sa.Column("tax_2", sa.Integer, nullable=False),
         sa.Column("created", sa.DateTime, nullable=False),
         sa.Column("updated", sa.DateTime, nullable=False),
-        sa.Column("customer_id", sa.Integer, nullable=False),
+        sa.Column("contract_id", sa.Integer, nullable=False),
+        sa.Column("bill_to_id", sa.Integer, nullable=False),
     )
     op.create_foreign_key(
         "fk_customer_id",
         Invoice.__tablename__,
-        Customer.__tablename__,
-        ["customer_id"],
+        Contract.__tablename__,
+        ["contract_id"],
         ["id"],
     )
 
@@ -72,13 +89,20 @@ def upgrade() -> None:
         sa.Column("to", sa.String(128), nullable=False),
         sa.Column("addr", sa.String(128), nullable=False),
         sa.Column("phone", sa.String(50), nullable=False),
-        sa.Column("invoice_id", sa.Integer, nullable=True),
+        sa.Column("contract_id", sa.Integer, nullable=False),
     )
     op.create_foreign_key(
-        "fk_invoice_id",
+        "fk_contract_id",
         BillTo.__tablename__,
+        Contract.__tablename__,
+        ["contract_id"],
+        ["id"],
+    )
+    op.create_foreign_key(
+        "fk_bill_to_id",
         Invoice.__tablename__,
-        ["invoice_id"],
+        BillTo.__tablename__,
+        ["bill_to_id"],
         ["id"],
     )
 
@@ -140,4 +164,5 @@ def downgrade() -> None:
     op.drop_table(BillTo.__tablename__)
     op.drop_table(Invoice.__tablename__)
     op.drop_table(TopInfo.__tablename__)
+    op.drop_table(Contract.__tablename__)
     op.drop_table(Customer.__tablename__)

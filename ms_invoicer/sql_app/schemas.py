@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Union
+from typing import List, Union
 from pydantic import BaseModel
 
 
@@ -44,6 +44,7 @@ class BillToBase(BaseModel):
     to: str
     addr: str
     phone: str
+    contract_id: int
 
 
 class BillToCreate(BillToBase):
@@ -52,7 +53,6 @@ class BillToCreate(BillToBase):
 
 class BillTo(BillToBase):
     id: int
-    invoice_id: Union[int, None]
 
     class Config:
         orm_mode = True
@@ -70,7 +70,6 @@ class TopInfoCreate(TopInfoBase):
 
 class TopInfo(TopInfoBase):
     id: int
-    customer_id: int
 
     class Config:
         orm_mode = True
@@ -78,7 +77,7 @@ class TopInfo(TopInfoBase):
 
 class FileBase(BaseModel):
     s3_xlsx_url: str
-    s3_pdf_url: Union[str , None]
+    s3_pdf_url: Union[str, None]
     created: datetime
     invoice_id: int
 
@@ -87,48 +86,87 @@ class FileCreate(FileBase):
     pass
 
 
-class CustomerBase(BaseModel):
+class ContractBase(BaseModel):
     name: str
     price_unit: int
+    customer_id: int
+
+
+class ContractCreate(ContractBase):
+    pass
+
+
+class ContractLite(ContractBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+class CustomerBase(BaseModel):
+    name: str
 
 
 class CustomerCreate(CustomerBase):
     pass
 
 
+class CustomerLite(CustomerBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 class Customer(CustomerBase):
     id: int
-    top_info: Union[TopInfo, None] = None
+    contracts: List[ContractLite] = []
 
     class Config:
         orm_mode = True
 
 
 class InvoiceBase(BaseModel):
+    number_id: int
     reason: str
     tax_1: int
     tax_2: int
     created: datetime
     updated: datetime
-    customer_id: int
+    contract_id: int
+    bill_to_id: int
 
 
 class InvoiceCreate(InvoiceBase):
     pass
 
 
-class Invoice(InvoiceBase):
+class InvoiceLite(InvoiceBase):
     id: int
-    bill_to: Union[BillTo, None] = None
-    customer: Customer
 
     class Config:
         orm_mode = True
 
+
+class Contract(ContractBase):
+    id: int
+    invoices: List[InvoiceLite] = []
+
+    class Config:
+        orm_mode = True
+
+
 class File(FileBase):
     id: int
-    invoice: Invoice
     services: list[Service] = []
+
+    class Config:
+        orm_mode = True
+
+class Invoice(InvoiceBase):
+    id: int
+    bill_to: BillTo
+    files: List[File] = []
 
     class Config:
         orm_mode = True

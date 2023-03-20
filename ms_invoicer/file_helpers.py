@@ -170,7 +170,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
         invoice_obj: schemas.Invoice = crud.get_invoice(
             db=conn, model_id=event.data.invoice_id
         )
-        file_obj: schemas.Invoice = crud.get_file(db=conn, model_id=event.data.file_id)
+        file_obj: schemas.File = crud.get_file(db=conn, model_id=event.data.file_id)
         data_event = PdfToProcessEvent(
             invoice=invoice_obj,
             file=file_obj,

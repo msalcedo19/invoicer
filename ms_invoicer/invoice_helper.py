@@ -16,7 +16,7 @@ base = os.path.dirname(os.path.dirname(__file__))
 
 def build_pdf(event: PdfToProcessEvent):
     assert event.html_template_name.endswith(".html")
-    # assert event.invoice.bill_to is not None TODO:  Especificar comportamiento con el cliente
+    assert event.invoice.bill_to is not None # TODO:  Especificar comportamiento con el cliente
     assert len(event.file.services) != 0
 
     input_html_path: str = os.path.join(
@@ -51,12 +51,12 @@ def build_pdf(event: PdfToProcessEvent):
 
         bill_to_data = {}
         if event.invoice.bill_to:
-            """bill_to_data["to"] = event.invoice.bill_to.to
+            bill_to_data["to"] = event.invoice.bill_to.to
             bill_to_data["addr"] = event.invoice.bill_to.addr
-            bill_to_data["phone"] = event.invoice.bill_to.phone"""
-        bill_to_data["to"] = "Sparksuite, Inc."
+            bill_to_data["phone"] = event.invoice.bill_to.phone
+        """bill_to_data["to"] = "Sparksuite, Inc."
         bill_to_data["addr"] = "12345 Sunny Road Sunnyville, CA 12345"
-        bill_to_data["phone"] = "1234567890"
+        bill_to_data["phone"] = "1234567890"""
 
         service_data = {}
         subtotal = 0
