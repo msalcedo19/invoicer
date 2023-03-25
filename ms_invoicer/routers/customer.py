@@ -9,7 +9,7 @@ from ms_invoicer.db_pool import get_db
 router = APIRouter()
 
 
-@router.get("/customer/", response_model=list[schemas.CustomerLite])
+@router.get("/customer/", response_model=list[schemas.Customer])
 def get_customers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_customers(db=db, skip=skip, limit=limit)
 

@@ -65,9 +65,9 @@ def build_pdf(event: PdfToProcessEvent):
             service_data["service_id{}".format(index)] = index+1
             service_data["service_txt{}".format(index)] = service.title
             service_data["num_hours{}".format(index)] = service.hours
-            service_data["per_hour{}".format(index)] = service.price_unit
+            service_data["per_hour{}".format(index)] = event.contract.price_unit
             service_data["amount{}".format(index)] = service.amount
-            subtotal += service.hours * service.price_unit
+            subtotal += service.hours * event.contract.price_unit
             index += 1
 
         total_tax_1 = (event.invoice.tax_1/100) * subtotal

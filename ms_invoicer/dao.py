@@ -1,7 +1,7 @@
 from ms_invoicer.event_bus import Event
 from typing import Any, Dict, List
 
-from ms_invoicer.sql_app.schemas import Invoice, File
+from ms_invoicer.sql_app.schemas import Invoice, File, Contract
 
 class FilesToProcessData():
     files_to_process: List[Dict[str, Any]]
@@ -33,7 +33,8 @@ class PdfToProcessEvent(Event):
     """
     TODO: Add description
     """
-    def __init__(self, invoice: Invoice, file: File, html_template_name: str):
+    def __init__(self, invoice: Invoice, file: File, html_template_name: str, contract: Contract):
         self.invoice = invoice
         self.file = file
         self.html_template_name = html_template_name
+        self.contract = contract

@@ -7,6 +7,7 @@ class GlobalBase(BaseModel):
     name: str
     value: str
     created: datetime
+    updated: datetime
 
 
 class GlobalCreate(GlobalBase):
@@ -113,6 +114,7 @@ class CustomerCreate(CustomerBase):
 
 class CustomerLite(CustomerBase):
     id: int
+    num_contracts: int
 
     class Config:
         orm_mode = True
@@ -147,15 +149,6 @@ class InvoiceLite(InvoiceBase):
     class Config:
         orm_mode = True
 
-
-class Contract(ContractBase):
-    id: int
-    invoices: List[InvoiceLite] = []
-
-    class Config:
-        orm_mode = True
-
-
 class File(FileBase):
     id: int
     services: list[Service] = []
@@ -167,6 +160,14 @@ class Invoice(InvoiceBase):
     id: int
     bill_to: BillTo
     files: List[File] = []
+
+    class Config:
+        orm_mode = True
+
+
+class Contract(ContractBase):
+    id: int
+    invoices: List[Invoice] = []
 
     class Config:
         orm_mode = True

@@ -137,7 +137,14 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
     try:
         col_letter = event.data.col_letter
         currency = event.data.currency
-        price_unit = event.data.price_unit
+
+        conn = next(get_db())
+        invoice_obj: schemas.Invoice = crud.get_invoice(
+            db=conn, model_id=event.data.invoice_id
+        )
+        file_obj: schemas.File = crud.get_file(db=conn, model_id=event.data.file_id)
+        contract_obj = crud.get_contract(db=conn, model_id=invoice_obj.contract_id)
+        price_unit = contract_obj.price_unit
         for file in event.data.files_to_process:
             xlsx_file = Path(file)
             wb_obj = openpyxl.load_workbook(xlsx_file)
@@ -166,15 +173,12 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                     service_created = schemas.ServiceCreate(**contract_dict)
                     crud.create_service(db=next(get_db()), model=service_created)
 
-        conn = next(get_db())
-        invoice_obj: schemas.Invoice = crud.get_invoice(
-            db=conn, model_id=event.data.invoice_id
-        )
-        file_obj: schemas.File = crud.get_file(db=conn, model_id=event.data.file_id)
+        
         data_event = PdfToProcessEvent(
             invoice=invoice_obj,
             file=file_obj,
             html_template_name="template01.html",
+            contract=contract_obj
         )
         await publish(data_event)
         event_handled = True

@@ -147,12 +147,13 @@ def upgrade() -> None:
         sa.Column("name", sa.String(128), nullable=False),
         sa.Column("value", sa.String(128), nullable=False),
         sa.Column("created", sa.DateTime, nullable=False),
+        sa.Column("updated", sa.DateTime, nullable=False),
     )
     op.bulk_insert(
         global_table,
         [
-            {"name": "tax_1", "value": "10", "created": datetime.now()},
-            {"name": "tax_2", "value": "5", "created": datetime.now()},
+            {"name": "tax_1", "value": "10", "created": datetime.now(), "updated": datetime.now()},
+            {"name": "tax_2", "value": "5", "created": datetime.now(), "updated": datetime.now()},
         ],
     )
 
@@ -161,8 +162,8 @@ def downgrade() -> None:
     op.drop_table(Globals.__tablename__)
     op.drop_table(Service.__tablename__)
     op.drop_table(File.__tablename__)
-    op.drop_table(BillTo.__tablename__)
     op.drop_table(Invoice.__tablename__)
+    op.drop_table(BillTo.__tablename__)
     op.drop_table(TopInfo.__tablename__)
     op.drop_table(Contract.__tablename__)
     op.drop_table(Customer.__tablename__)

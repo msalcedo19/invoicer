@@ -1,3 +1,4 @@
+from typing import List
 from sqlalchemy.orm import Session
 
 from ms_invoicer.sql_app import models, schemas
@@ -6,6 +7,24 @@ from ms_invoicer.sql_app import models, schemas
 # Globals ----------------------------------------------------------
 def get_global(db: Session, global_name: str):
     return db.query(models.Globals).filter(models.Globals.name == global_name).first()
+
+
+def get_global_by_id(db: Session, model_id: str):
+    return db.query(models.Globals).filter(models.Globals.id == model_id).first()
+
+
+def get_globals(db: Session):
+    return db.query(models.Globals).all()
+
+
+def patch_global(db: Session, model_id: int, update_dict: dict):
+    result = (
+        db.query(models.Globals)
+        .filter(models.Globals.id == model_id)
+        .update(update_dict)
+    )
+    db.commit()
+    return result
 
 
 # Contract ----------------------------------------------------------
@@ -31,6 +50,16 @@ def delete_contract(db: Session, model_id: int):
     return result
 
 
+def patch_contract(db: Session, model_id: int, update_dict: dict):
+    result = (
+        db.query(models.Contract)
+        .filter(models.Contract.id == model_id)
+        .update(update_dict)
+    )
+    db.commit()
+    return result
+
+
 def create_contract(db: Session, model: schemas.ContractBase):
     print(model)
     db_model = models.Contract(**model.dict())
@@ -45,16 +74,18 @@ def get_customer(db: Session, model_id: int):
     return db.query(models.Customer).filter(models.Customer.id == model_id).first()
 
 
-def get_customers(db: Session, skip: int = 0, limit: int = 100):
+def get_customers(db: Session, skip: int = 0, limit: int = 100) -> List[models.Customer]:
     return db.query(models.Customer).offset(skip).limit(limit).all()
 
 
 def patch_customer(db: Session, model_id: int, update_dict: dict):
-    return (
+    result = (
         db.query(models.Customer)
         .filter(models.Customer.id == model_id)
         .update(update_dict)
     )
+    db.commit()
+    return result
 
 
 def delete_customer(db: Session, model_id: int):
@@ -185,11 +216,13 @@ def get_invoices(db: Session, skip: int = 0, limit: int = 100):
 
 
 def patch_invoice(db: Session, model_id: int, update_dict: dict):
-    return (
+    result = (
         db.query(models.Invoice)
         .filter(models.Invoice.id == model_id)
         .update(update_dict)
     )
+    db.commit()
+    return result
 
 
 def delete_invoice(db: Session, model_id: int):

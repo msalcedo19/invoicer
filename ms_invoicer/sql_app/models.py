@@ -12,6 +12,10 @@ class Customer(Base):
 
     contracts = relationship("Contract")
 
+    @property
+    def num_contracts(self):
+        return len(self.contracts)
+
 
 class Contract(Base):
     __tablename__ = "contracts"
@@ -38,7 +42,7 @@ class Invoice(Base):
     bill_to_id = Column(Integer, ForeignKey("billto.id"))
 
     contract = relationship("Contract", back_populates="invoices", uselist=False)
-    bill_to = relationship("BillTo", back_populates="invoice", uselist=False)
+    bill_to = relationship("BillTo", uselist=False)
     files = relationship("File", back_populates="invoice")
 
 
@@ -50,8 +54,6 @@ class BillTo(Base):
     addr = Column(String)
     phone = Column(String)
     contract_id = Column(Integer, ForeignKey("contracts.id"))
-
-    invoice = relationship("Invoice", back_populates="bill_to")
 
 
 class Service(Base):
@@ -96,3 +98,4 @@ class Globals(Base):
     name = Column(String, index=True)
     value = Column(String)
     created = Column(DateTime)
+    updated = Column(DateTime)

@@ -15,6 +15,15 @@ def post_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)):
     return crud.create_invoice(db=db, model=invoice)
 
 
+@router.patch("/invoice/{model_id}", response_model=Union[schemas.Invoice, None])
+def patch_invoice(model_update: dict, model_id: int, db: Session = Depends(get_db)):
+    result = crud.patch_invoice(db=db, model_id=model_id, update_dict=model_update)
+    if result:
+        return crud.get_invoice(db=db, model_id=model_id)
+    else:
+        return None
+
+
 @router.get("/invoice/{invoice_id}", response_model=Union[schemas.Invoice, None])
 def get_invoice(invoice_id: int, db: Session = Depends(get_db)):
     return crud.get_invoice(db=db, model_id=invoice_id)
