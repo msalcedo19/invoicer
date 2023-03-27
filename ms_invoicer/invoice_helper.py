@@ -16,9 +16,10 @@ base = os.path.dirname(os.path.dirname(__file__))
 
 def build_pdf(event: PdfToProcessEvent):
     assert event.html_template_name.endswith(".html")
-    assert event.invoice.bill_to is not None # TODO:  Especificar comportamiento con el cliente
+    assert event.invoice.bill_to is not None
     assert len(event.file.services) != 0
 
+    connection = next(get_db())
     input_html_path: str = os.path.join(
         base, "templates/base/{}".format(event.html_template_name)
     )
@@ -49,14 +50,20 @@ def build_pdf(event: PdfToProcessEvent):
         with open(output_html_path, "w") as file:
             file.write(str(soup))
 
+        top_info_data = {}
+        top_info = crud.get_topinfos(db=connection)
+        if len(top_info) > 0 and event.invoice.bill_to:
+            top_info = top_info[0]
+            top_info_data["top_info_from"] = top_info.ti_from
+            top_info_data["top_info_addr"] = top_info.addr
+            top_info_data["top_info_phone"] = top_info.phone
+            top_info_data["top_info_email"] = top_info.email
+
         bill_to_data = {}
         if event.invoice.bill_to:
             bill_to_data["to"] = event.invoice.bill_to.to
             bill_to_data["addr"] = event.invoice.bill_to.addr
             bill_to_data["phone"] = event.invoice.bill_to.phone
-        """bill_to_data["to"] = "Sparksuite, Inc."
-        bill_to_data["addr"] = "12345 Sunny Road Sunnyville, CA 12345"
-        bill_to_data["phone"] = "1234567890"""
 
         service_data = {}
         subtotal = 0
@@ -83,6 +90,7 @@ def build_pdf(event: PdfToProcessEvent):
         }
         context |= bill_to_data
         context |= service_data
+        context |= top_info_data
 
         template_loader = jinja2.FileSystemLoader(os.path.join(base, "templates"))
         template_env = jinja2.Environment(loader=template_loader)
@@ -98,7 +106,7 @@ def build_pdf(event: PdfToProcessEvent):
 
         s3_pdf_url = upload_file(file_path=output_pdf_path, file_name=filename)
         crud.patch_file(
-            db=next(get_db()),
+            db=connection,
             model_id=event.file.id,
             update_dict={"s3_pdf_url": s3_pdf_url},
         )

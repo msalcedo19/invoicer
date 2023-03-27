@@ -4,6 +4,25 @@ from sqlalchemy.orm import Session
 from ms_invoicer.sql_app import models, schemas
 
 
+# TopInfo ----------------------------------------------------------
+def get_topinfos(db: Session):
+    return db.query(models.TopInfo).all()
+
+
+def get_topinfo_by_id(db: Session, model_id: str):
+    return db.query(models.TopInfo).filter(models.TopInfo.id == model_id).first()
+
+
+def patch_topinfo(db: Session, model_id: int, update_dict: dict):
+    result = (
+        db.query(models.TopInfo)
+        .filter(models.TopInfo.id == model_id)
+        .update(update_dict)
+    )
+    db.commit()
+    return result
+
+
 # Globals ----------------------------------------------------------
 def get_global(db: Session, global_name: str):
     return db.query(models.Globals).filter(models.Globals.name == global_name).first()
@@ -124,10 +143,9 @@ def patch_file(db: Session, model_id: int, update_dict: dict):
 
 
 def delete_file(db: Session, model_id: int):
-    result = db.query(models.File).filter(models.File.id == model_id).first()
-    db.delete(result)
+    result = db.query(models.File).filter(models.File.id == model_id).delete()
     db.commit()
-    return len(result)
+    return result
 
 
 def delete_files_by_invoice(db: Session, model_id: int):

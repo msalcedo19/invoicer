@@ -60,8 +60,9 @@ class BillTo(BillToBase):
 
 
 class TopInfoBase(BaseModel):
-    to: str
-    addr: int
+    ti_from: str
+    email: str
+    addr: str
     phone: str
 
 
@@ -99,6 +100,7 @@ class ContractCreate(ContractBase):
 
 class ContractLite(ContractBase):
     id: int
+    num_invoices: int
 
     class Config:
         orm_mode = True

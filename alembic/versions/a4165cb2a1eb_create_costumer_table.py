@@ -48,19 +48,24 @@ def upgrade() -> None:
         ["id"],
     )
 
-    op.create_table(
+    top_info_table = op.create_table(
         TopInfo.__tablename__,
         sa.Column("id", sa.Integer, primary_key=True),
+        sa.Column("ti_from", sa.String(128), nullable=False),
         sa.Column("addr", sa.String(128), nullable=False),
+        sa.Column("email", sa.String(128), nullable=False),
         sa.Column("phone", sa.String(50), nullable=False),
-        sa.Column("customer_id", sa.Integer, nullable=False),
     )
-    op.create_foreign_key(
-        "fk_customer_id",
-        TopInfo.__tablename__,
-        Customer.__tablename__,
-        ["customer_id"],
-        ["id"],
+    op.bulk_insert(
+        top_info_table,
+        [
+            {
+                "ti_from": "John Doe",
+                "addr": "5655 rue Bellerive, Brossard,Qc,J4Z 3C9",
+                "email": "john@example.com",
+                "phone": "450-888 4035",
+            },
+        ],
     )
 
     op.create_table(
@@ -105,7 +110,6 @@ def upgrade() -> None:
         ["bill_to_id"],
         ["id"],
     )
-
 
     op.create_table(
         File.__tablename__,
@@ -152,8 +156,18 @@ def upgrade() -> None:
     op.bulk_insert(
         global_table,
         [
-            {"name": "tax_1", "value": "10", "created": datetime.now(), "updated": datetime.now()},
-            {"name": "tax_2", "value": "5", "created": datetime.now(), "updated": datetime.now()},
+            {
+                "name": "tax_1",
+                "value": "10",
+                "created": datetime.now(),
+                "updated": datetime.now(),
+            },
+            {
+                "name": "tax_2",
+                "value": "5",
+                "created": datetime.now(),
+                "updated": datetime.now(),
+            },
         ],
     )
 

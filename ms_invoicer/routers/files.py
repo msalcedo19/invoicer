@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, UploadFile, APIRouter, Form
+from fastapi import Depends, FastAPI, UploadFile, APIRouter, Form, status
 from sqlalchemy.orm import Session
 from ms_invoicer.sql_app import crud, schemas, models
 from ms_invoicer.file_helpers import process_file, save_file
@@ -25,6 +25,14 @@ def patch_customer(model_update: dict, model_id: int, db: Session = Depends(get_
         return crud.get_file(db=db, model_id=model_id)
     else:
         return None
+
+
+@router.delete("/files/{model_id}", status_code=status.HTTP_200_OK)
+def delete_file(model_id: int, db: Session = Depends(get_db)):
+    file = crud.get_file(db=db, model_id=model_id)
+    crud.delete_services_by_file(db=db, model_id=file.id)
+    return crud.delete_file(db=db, model_id=model_id)
+
 
 @router.post("/upload_file/", response_model=schemas.File)
 async def create_upload_file(

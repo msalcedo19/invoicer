@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 from typing import List
 
@@ -93,8 +94,30 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                     "active": True,
                 }
                 result["options"].append(next_option)
+            elif parts[0] == "invoice":
+                invoice = crud.get_invoice(db=db, model_id=parts[1])
+                contract = crud.get_contract(db=db, model_id=invoice.contract_id)
+                customer = crud.get_customer(db=db, model_id=contract.customer_id)
+                next_option = {
+                    "value": customer.name,
+                    "href": "/contract/{}".format(customer.id),
+                    "active": False,
+                }
+                result["options"].append(next_option)
+                next_option = {
+                    "value": contract.name,
+                    "href": "/contract/{}".format(contract.id),
+                    "active": False,
+                }
+                result["options"].append(next_option)
+                next_option = {
+                    "value": invoice.number_id,
+                    "href": "/invoice/{}".format(invoice.id),
+                    "active": True,
+                }
+                result["options"].append(next_option)
             return result
-    return {"status": "OK"}
+    return result
 
 
 @api.get("/global/{global_name}", response_model=schemas.Global)
@@ -107,13 +130,14 @@ def get_global(db: Session = Depends(get_db)):
     return crud.get_globals(db=db)
 
 
-@api.patch("/global/{model_id}", response_model=schemas.Global)
+@api.patch("/global/{model_id}", response_model=list[schemas.Global])
 def update_global(model: dict, model_id: int, db: Session = Depends(get_db)):
+    model["updated"] = datetime.now()
     result = crud.patch_global(db=db, model_id=model_id, update_dict=model)
     if result:
-        return crud.get_global_by_id(db=db, model_id=model_id)
+        return crud.get_globals(db=db)
     else:
-        return None
+        return []
 
 
 @api.get("/service/", response_model=List[schemas.Service])
@@ -127,5 +151,19 @@ def create_bill_to(model: schemas.BillToCreate, db: Session = Depends(get_db)):
 
 
 @api.get("/bill_to/", response_model=list[schemas.BillTo])
-def get_customers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_billtos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_billtos(db=db, skip=skip, limit=limit)
+
+
+@api.get("/topinfo/", response_model=list[schemas.TopInfo])
+def get_topinfos(db: Session = Depends(get_db)):
+    return crud.get_topinfos(db=db)
+
+
+@api.patch("/topinfo/{model_id}", response_model=list[schemas.TopInfo])
+def update_topinfo(model: dict, model_id: int, db: Session = Depends(get_db)):
+    result = crud.patch_topinfo(db=db, model_id=model_id, update_dict=model)
+    if result:
+        return crud.get_topinfos(db=db)
+    else:
+        return None

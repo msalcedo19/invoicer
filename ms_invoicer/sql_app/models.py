@@ -27,6 +27,10 @@ class Contract(Base):
 
     invoices = relationship("Invoice", back_populates="contract")
 
+    @property
+    def num_invoices(self):
+        return len(self.invoices)
+
 
 class Invoice(Base):
     __tablename__ = "invoices"
@@ -74,7 +78,9 @@ class TopInfo(Base):
     __tablename__ = "topinfos"
 
     id = Column(Integer, primary_key=True, index=True)
+    ti_from = Column(String)
     addr = Column(String)
+    email = Column(String)
     phone = Column(String)
 
 
