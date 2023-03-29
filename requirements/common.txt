@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+psycopg2
+python-multipart
+openpyxl
+beautifulsoup4
+pdfkit
+jinja2
+boto3
