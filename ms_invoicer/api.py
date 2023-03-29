@@ -3,16 +3,16 @@ import logging
 from typing import List
 
 from ms_invoicer.config import LOG_LEVEL
-from fastapi import Depends, FastAPI, Form, UploadFile
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from ms_invoicer.sql_app import crud, schemas, models
+from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.event_handler import register_event_handlers
 from ms_invoicer.db_pool import get_db
-from ms_invoicer.invoice_helper import build_pdf
-from ms_invoicer.file_helpers import upload_file, process_file, save_file
+from ms_invoicer.utils import create_folders
 from ms_invoicer.routers import customer, invoice, files, contract
 
+create_folders()
 api = FastAPI()
 api.add_middleware(
     CORSMiddleware,
@@ -32,17 +32,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 register_event_handlers()
-
-
-@api.get("/test")
-async def test(db: Session = Depends(get_db), file: UploadFile = Form()):
-    # build_pdf(html_name="template01.html", pdf_name="invoice01.pdf", invoice=crud.get_invoice(db=db, model_id=6))
-    file_path = "temp/" + file.filename
-
-    save_file(file_path, file)
-
-    file_created = await process_file(file_path, 1)
-    return {"status": "OK"}
 
 
 @api.get("/")

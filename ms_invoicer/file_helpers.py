@@ -5,7 +5,7 @@ import openpyxl
 from fastapi import UploadFile
 from pathlib import Path
 import logging
-from ms_invoicer.sql_app import crud, schemas, models
+from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import check_dates
 from ms_invoicer.dao import FilesToProcessData, FilesToProcessEvent, PdfToProcessEvent
 from ms_invoicer.event_bus import publish
