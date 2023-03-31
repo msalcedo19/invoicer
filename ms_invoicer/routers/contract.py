@@ -14,6 +14,11 @@ def get_contract(model_id: int, db: Session = Depends(get_db)):
     return crud.get_contract(db=db, model_id=model_id)
 
 
+@router.get("/contract/", response_model=list[schemas.Contract])
+def get_contracts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_contracts(db=db, skip=skip, limit=limit)
+
+
 @router.patch("/contract/{model_id}", response_model=Union[schemas.Contract, None])
 def patch_contract(model_update: dict, model_id: int, db: Session = Depends(get_db)):
     result = crud.patch_contract(db=db, model_id=model_id, update_dict=model_update)

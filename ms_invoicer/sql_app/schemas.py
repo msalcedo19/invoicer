@@ -45,7 +45,6 @@ class BillToBase(BaseModel):
     to: str
     addr: str
     phone: str
-    contract_id: int
 
 
 class BillToCreate(BillToBase):

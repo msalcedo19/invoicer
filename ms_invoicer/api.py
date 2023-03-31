@@ -56,6 +56,26 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
     if current_path:
         parts = current_path.split("/")[1:]
         if len(parts) == 1:
+            if parts[0] == "customer":
+                result = {
+                    "options": [
+                        {
+                            "value": "Clientes",
+                            "href": "/customer",
+                            "active": True,
+                        },
+                    ]
+                }
+            else:
+                result = {
+                    "options": [
+                        {
+                            "value": "Contratos",
+                            "href": "/contract",
+                            "active": True,
+                        },
+                    ]
+                }
             return result
         elif len(parts) == 2:
             for option in result["options"]:
@@ -73,7 +93,7 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                 customer = crud.get_customer(db=db, model_id=contract.customer_id)
                 next_option = {
                     "value": customer.name,
-                    "href": "/contract/{}".format(customer.id),
+                    "href": "/customer/{}".format(customer.id),
                     "active": False,
                 }
                 result["options"].append(next_option)
@@ -89,7 +109,7 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                 customer = crud.get_customer(db=db, model_id=contract.customer_id)
                 next_option = {
                     "value": customer.name,
-                    "href": "/contract/{}".format(customer.id),
+                    "href": "/customer/{}".format(customer.id),
                     "active": False,
                 }
                 result["options"].append(next_option)
@@ -115,7 +135,7 @@ def get_global(global_name: str, db: Session = Depends(get_db)):
 
 
 @api.get("/global/", response_model=list[schemas.Global])
-def get_global(db: Session = Depends(get_db)):
+def get_globals(db: Session = Depends(get_db)):
     return crud.get_globals(db=db)
 
 
