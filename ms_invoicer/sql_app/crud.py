@@ -51,6 +51,10 @@ def get_contract(db: Session, model_id: int):
     return db.query(models.Contract).filter(models.Contract.id == model_id).first()
 
 
+def get_contracts(db: Session, skip: int = 0, limit: int = 100) -> List[models.Customer]:
+    return db.query(models.Contract).offset(skip).limit(limit).all()
+
+
 def get_contracts_by_customer(db: Session, model_id: int):
     return (
         db.query(models.Contract).filter(models.Contract.customer_id == model_id).all()

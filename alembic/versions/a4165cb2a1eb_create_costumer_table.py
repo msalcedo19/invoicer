@@ -94,14 +94,6 @@ def upgrade() -> None:
         sa.Column("to", sa.String(128), nullable=False),
         sa.Column("addr", sa.String(128), nullable=False),
         sa.Column("phone", sa.String(50), nullable=False),
-        sa.Column("contract_id", sa.Integer, nullable=False),
-    )
-    op.create_foreign_key(
-        "fk_contract_id",
-        BillTo.__tablename__,
-        Contract.__tablename__,
-        ["contract_id"],
-        ["id"],
     )
     op.create_foreign_key(
         "fk_bill_to_id",
@@ -157,13 +149,13 @@ def upgrade() -> None:
         global_table,
         [
             {
-                "name": "tax_1",
+                "name": "TPS 709597603 RT0001",
                 "value": "10",
                 "created": datetime.now(),
                 "updated": datetime.now(),
             },
             {
-                "name": "tax_2",
+                "name": "TVQ1229793019 TQ0001",
                 "value": "5",
                 "created": datetime.now(),
                 "updated": datetime.now(),

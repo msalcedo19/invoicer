@@ -57,7 +57,6 @@ class BillTo(Base):
     to = Column(String)
     addr = Column(String)
     phone = Column(String)
-    contract_id = Column(Integer, ForeignKey("contracts.id"))
 
 
 class Service(Base):

@@ -65,3 +65,4 @@ venv/
 
 # Extras
 temp/
+*.pem
