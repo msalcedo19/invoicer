@@ -51,7 +51,9 @@ def get_contract(db: Session, model_id: int):
     return db.query(models.Contract).filter(models.Contract.id == model_id).first()
 
 
-def get_contracts(db: Session, skip: int = 0, limit: int = 100) -> List[models.Customer]:
+def get_contracts(
+    db: Session, skip: int = 0, limit: int = 100
+) -> List[models.Customer]:
     return db.query(models.Contract).offset(skip).limit(limit).all()
 
 
@@ -62,7 +64,11 @@ def get_contracts_by_customer(db: Session, model_id: int):
 
 
 def delete_contracts_by_customer(db: Session, model_id: int):
-    result = db.query(models.Contract).filter(models.Contract.customer_id == model_id).delete()
+    result = (
+        db.query(models.Contract)
+        .filter(models.Contract.customer_id == model_id)
+        .delete()
+    )
     db.commit()
     return result
 
@@ -97,7 +103,9 @@ def get_customer(db: Session, model_id: int):
     return db.query(models.Customer).filter(models.Customer.id == model_id).first()
 
 
-def get_customers(db: Session, skip: int = 0, limit: int = 100) -> List[models.Customer]:
+def get_customers(
+    db: Session, skip: int = 0, limit: int = 100
+) -> List[models.Customer]:
     return db.query(models.Customer).offset(skip).limit(limit).all()
 
 
@@ -180,7 +188,9 @@ def patch_billto(db: Session, model_id: int, update_dict: dict):
 
 
 def delete_billto(db: Session, model_id: int):
-    return db.query(models.BillTo).filter(models.BillTo.id == model_id).delete()
+    result = db.query(models.BillTo).filter(models.BillTo.id == model_id).delete()
+    db.commit()
+    return result
 
 
 def create_billto(db: Session, model: schemas.BillToCreate):

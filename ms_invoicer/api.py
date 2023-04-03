@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from ms_invoicer.config import LOG_LEVEL
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from ms_invoicer.sql_app import crud, schemas
@@ -162,6 +162,11 @@ def create_bill_to(model: schemas.BillToCreate, db: Session = Depends(get_db)):
 @api.get("/bill_to/", response_model=list[schemas.BillTo])
 def get_billtos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_billtos(db=db, skip=skip, limit=limit)
+
+
+@api.delete("/bill_to/{model_id}", status_code=status.HTTP_200_OK)
+def delete_bill_to(model_id: int, db: Session = Depends(get_db)):
+    return crud.delete_billto(db=db, model_id=model_id)
 
 
 @api.get("/topinfo/", response_model=list[schemas.TopInfo])

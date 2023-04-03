@@ -94,6 +94,7 @@ def upgrade() -> None:
         sa.Column("to", sa.String(128), nullable=False),
         sa.Column("addr", sa.String(128), nullable=False),
         sa.Column("phone", sa.String(50), nullable=False),
+        sa.Column("email", sa.String(50), nullable=False),
     )
     op.create_foreign_key(
         "fk_bill_to_id",

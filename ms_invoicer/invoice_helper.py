@@ -101,7 +101,7 @@ def build_pdf(event: PdfToProcessEvent):
         date_now = datetime.now()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
         output_pdf_path: str = "temp/pdf/{}".format(filename)
-        config = pdfkit.configuration(wkhtmltopdf="/usr/local/bin/wkhtmltopdf")
+        config = pdfkit.configuration(wkhtmltopdf="/usr/local/bin/wkhtmltopdf") #TODO: Modificar en la máquina
         pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
         s3_pdf_url = upload_file(file_path=output_pdf_path, file_name=filename)

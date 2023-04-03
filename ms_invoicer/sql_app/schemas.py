@@ -45,6 +45,7 @@ class BillToBase(BaseModel):
     to: str
     addr: str
     phone: str
+    email: str
 
 
 class BillToCreate(BillToBase):

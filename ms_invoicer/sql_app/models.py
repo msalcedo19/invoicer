@@ -57,6 +57,7 @@ class BillTo(Base):
     to = Column(String)
     addr = Column(String)
     phone = Column(String)
+    email = Column(String)
 
 
 class Service(Base):
