@@ -26,8 +26,9 @@ class ServiceBase(BaseModel):
     amount: int
     currency: str
     hours: int
-    price_unit: int
+    price_unit: float
     file_id: int
+    invoice_id: int
 
 
 class ServiceCreate(ServiceBase):
@@ -82,28 +83,11 @@ class FileBase(BaseModel):
     s3_pdf_url: Union[str, None]
     created: datetime
     invoice_id: int
+    bill_to_id: int
 
 
 class FileCreate(FileBase):
     pass
-
-
-class ContractBase(BaseModel):
-    name: str
-    price_unit: int
-    customer_id: int
-
-
-class ContractCreate(ContractBase):
-    pass
-
-
-class ContractLite(ContractBase):
-    id: int
-    num_invoices: int
-
-    class Config:
-        orm_mode = True
 
 
 class CustomerBase(BaseModel):
@@ -116,15 +100,7 @@ class CustomerCreate(CustomerBase):
 
 class CustomerLite(CustomerBase):
     id: int
-    num_contracts: int
-
-    class Config:
-        orm_mode = True
-
-
-class Customer(CustomerBase):
-    id: int
-    contracts: List[ContractLite] = []
+    num_invoices: int
 
     class Config:
         orm_mode = True
@@ -137,8 +113,7 @@ class InvoiceBase(BaseModel):
     tax_2: int
     created: datetime
     updated: datetime
-    contract_id: int
-    bill_to_id: int
+    customer_id: int
 
 
 class InvoiceCreate(InvoiceBase):
@@ -153,22 +128,23 @@ class InvoiceLite(InvoiceBase):
 
 class File(FileBase):
     id: int
+    bill_to: BillTo
     services: list[Service] = []
 
     class Config:
         orm_mode = True
 
+
 class Invoice(InvoiceBase):
     id: int
-    bill_to: BillTo
     files: List[File] = []
 
     class Config:
         orm_mode = True
 
-
-class Contract(ContractBase):
+class Customer(CustomerBase):
     id: int
+    num_invoices: int
     invoices: List[Invoice] = []
 
     class Config:

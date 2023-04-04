@@ -16,7 +16,7 @@ base = os.path.dirname(os.path.dirname(__file__))
 
 def build_pdf(event: PdfToProcessEvent):
     assert event.html_template_name.endswith(".html")
-    assert event.invoice.bill_to is not None
+    assert event.file.bill_to is not None
     assert len(event.file.services) != 0
 
     connection = next(get_db())
@@ -36,7 +36,6 @@ def build_pdf(event: PdfToProcessEvent):
                 "service_id",
                 "service_txt",
                 "num_hours",
-                "per_hour",
                 "amount",
             ]:
                 new_td_tag = soup.new_tag("td")
@@ -52,7 +51,7 @@ def build_pdf(event: PdfToProcessEvent):
 
         top_info_data = {}
         top_info = crud.get_topinfos(db=connection)
-        if len(top_info) > 0 and event.invoice.bill_to:
+        if len(top_info) > 0:
             top_info = top_info[0]
             top_info_data["top_info_from"] = top_info.ti_from
             top_info_data["top_info_addr"] = top_info.addr
@@ -60,10 +59,10 @@ def build_pdf(event: PdfToProcessEvent):
             top_info_data["top_info_email"] = top_info.email
 
         bill_to_data = {}
-        if event.invoice.bill_to:
-            bill_to_data["to"] = event.invoice.bill_to.to
-            bill_to_data["addr"] = event.invoice.bill_to.addr
-            bill_to_data["phone"] = event.invoice.bill_to.phone
+        if event.file.bill_to:
+            bill_to_data["to"] = event.file.bill_to.to
+            bill_to_data["addr"] = event.file.bill_to.addr
+            bill_to_data["phone"] = event.file.bill_to.phone
 
         service_data = {}
         subtotal = 0
@@ -72,9 +71,9 @@ def build_pdf(event: PdfToProcessEvent):
             service_data["service_id{}".format(index)] = index+1
             service_data["service_txt{}".format(index)] = service.title
             service_data["num_hours{}".format(index)] = service.hours
-            service_data["per_hour{}".format(index)] = event.contract.price_unit
+            #service_data["per_hour{}".format(index)] = service.price_unit
             service_data["amount{}".format(index)] = service.amount
-            subtotal += service.hours * event.contract.price_unit
+            subtotal += service.amount
             index += 1
 
         total_tax_1 = (event.invoice.tax_1/100) * subtotal
@@ -83,10 +82,10 @@ def build_pdf(event: PdfToProcessEvent):
         context = {
             "invoice_id": event.invoice.id,
             "created": event.invoice.created,
-            "total_no_taxes": subtotal,
-            "total_tax1": total_tax_1,
-            "total_tax2": total_tax_2,
-            "total": total,
+            "total_no_taxes": round(subtotal, 2),
+            "total_tax1": round(total_tax_1, 2),
+            "total_tax2": round(total_tax_2, 2),
+            "total": round(total, 2),
         }
         context |= bill_to_data
         context |= service_data

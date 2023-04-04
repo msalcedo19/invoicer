@@ -48,50 +48,44 @@ def patch_global(db: Session, model_id: int, update_dict: dict):
 
 # Contract ----------------------------------------------------------
 def get_contract(db: Session, model_id: int):
-    return db.query(models.Contract).filter(models.Contract.id == model_id).first()
+    return db.query(models.Service).filter(models.Service.id == model_id).first()
 
 
 def get_contracts(
     db: Session, skip: int = 0, limit: int = 100
 ) -> List[models.Customer]:
-    return db.query(models.Contract).offset(skip).limit(limit).all()
+    return db.query(models.Service).offset(skip).limit(limit).all()
 
 
 def get_contracts_by_customer(db: Session, model_id: int):
     return (
-        db.query(models.Contract).filter(models.Contract.customer_id == model_id).all()
+        db.query(models.Service)
+        .filter(
+            models.Service.invoice_id == models.Invoice.id
+            and models.Invoice.customer_id == model_id
+        )
+        .all()
     )
-
-
-def delete_contracts_by_customer(db: Session, model_id: int):
-    result = (
-        db.query(models.Contract)
-        .filter(models.Contract.customer_id == model_id)
-        .delete()
-    )
-    db.commit()
-    return result
 
 
 def delete_contract(db: Session, model_id: int):
-    result = db.query(models.Contract).filter(models.Contract.id == model_id).delete()
+    result = db.query(models.Service).filter(models.Service.id == model_id).delete()
     db.commit()
     return result
 
 
 def patch_contract(db: Session, model_id: int, update_dict: dict):
     result = (
-        db.query(models.Contract)
-        .filter(models.Contract.id == model_id)
+        db.query(models.Service)
+        .filter(models.Service.id == model_id)
         .update(update_dict)
     )
     db.commit()
     return result
 
 
-def create_contract(db: Session, model: schemas.ContractBase):
-    print(model)
-    db_model = models.Contract(**model.dict())
+def create_contract(db: Session, model: schemas.ServiceBase):
+    db_model = models.Service(**model.dict())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -239,8 +233,8 @@ def get_invoice(db: Session, model_id: int):
     return db.query(models.Invoice).filter(models.Invoice.id == model_id).first()
 
 
-def get_invoices_by_contract(db: Session, model_id: int):
-    return db.query(models.Invoice).filter(models.Invoice.contract_id == model_id).all()
+def get_invoices_by_customer(db: Session, model_id: int):
+    return db.query(models.Invoice).filter(models.Invoice.customer_id == model_id).all()
 
 
 def get_invoices(db: Session, skip: int = 0, limit: int = 100):
@@ -263,9 +257,9 @@ def delete_invoice(db: Session, model_id: int):
     db.commit()
 
 
-def delete_invoices_by_contract(db: Session, model_id: int):
+def delete_invoices_by_customer(db: Session, model_id: int):
     return (
-        db.query(models.Invoice).filter(models.Invoice.contract_id == model_id).delete()
+        db.query(models.Invoice).filter(models.Invoice.customer_id == model_id).delete()
     )
 
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Double
 from sqlalchemy.orm import relationship
 
 from ms_invoicer.sql_app.database import Base
@@ -10,22 +10,7 @@ class Customer(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
 
-    contracts = relationship("Contract")
-
-    @property
-    def num_contracts(self):
-        return len(self.contracts)
-
-
-class Contract(Base):
-    __tablename__ = "contracts"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    price_unit = Column(Integer)
-    customer_id = Column(Integer, ForeignKey("customers.id"))
-
-    invoices = relationship("Invoice", back_populates="contract")
+    invoices = relationship("Invoice")
 
     @property
     def num_invoices(self):
@@ -42,12 +27,10 @@ class Invoice(Base):
     tax_2 = Column(Integer)
     created = Column(DateTime)
     updated = Column(DateTime)
-    contract_id = Column(Integer, ForeignKey("contracts.id"))
-    bill_to_id = Column(Integer, ForeignKey("billto.id"))
+    customer_id = Column(Integer, ForeignKey("customers.id"))
 
-    contract = relationship("Contract", back_populates="invoices", uselist=False)
-    bill_to = relationship("BillTo", uselist=False)
-    files = relationship("File", back_populates="invoice")
+    customer = relationship("Customer", back_populates="invoices", uselist=False)
+    files = relationship("File")
 
 
 class BillTo(Base):
@@ -68,10 +51,9 @@ class Service(Base):
     amount = Column(Integer)
     currency = Column(String)
     hours = Column(Integer)
-    price_unit = Column(Integer)
+    price_unit = Column(Double)
     file_id = Column(Integer, ForeignKey("files.id"))
-
-    file = relationship("File", back_populates="services", uselist=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"))
 
 
 class TopInfo(Base):
@@ -92,9 +74,10 @@ class File(Base):
     s3_pdf_url = Column(String)
     created = Column(DateTime)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
+    bill_to_id = Column(Integer, ForeignKey("billto.id"))
 
-    services = relationship("Service", back_populates="file")
-    invoice = relationship("Invoice", back_populates="files")
+    bill_to = relationship("BillTo", uselist=False)
+    services = relationship("Service")
 
 
 class Globals(Base):

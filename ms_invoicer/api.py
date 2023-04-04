@@ -88,9 +88,10 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                     "active": True,
                 }
                 result["options"].append(next_option)
-            elif parts[0] == "contract":
-                contract = crud.get_contract(db=db, model_id=parts[1])
-                customer = crud.get_customer(db=db, model_id=contract.customer_id)
+            elif parts[0] == "file":
+                file = crud.get_file(db=db, model_id=parts[1])
+                invoice = crud.get_invoice(db=db, model_id=file.invoice_id)
+                customer = crud.get_customer(db=db, model_id=invoice.customer_id)
                 next_option = {
                     "value": customer.name,
                     "href": "/customer/{}".format(customer.id),
@@ -98,15 +99,20 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                 }
                 result["options"].append(next_option)
                 next_option = {
-                    "value": contract.name,
-                    "href": "/contract/{}".format(contract.id),
+                    "value": "Factura {}".format(invoice.number_id),
+                    "href": "/invoice/{}".format(invoice.id),
+                    "active": False,
+                }
+                result["options"].append(next_option)
+                next_option = {
+                    "value": "Contratos",
+                    "href": "/file/{}".format(file.id),
                     "active": True,
                 }
                 result["options"].append(next_option)
             elif parts[0] == "invoice":
                 invoice = crud.get_invoice(db=db, model_id=parts[1])
-                contract = crud.get_contract(db=db, model_id=invoice.contract_id)
-                customer = crud.get_customer(db=db, model_id=contract.customer_id)
+                customer = crud.get_customer(db=db, model_id=invoice.customer_id)
                 next_option = {
                     "value": customer.name,
                     "href": "/customer/{}".format(customer.id),
@@ -114,13 +120,7 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                 }
                 result["options"].append(next_option)
                 next_option = {
-                    "value": contract.name,
-                    "href": "/contract/{}".format(contract.id),
-                    "active": False,
-                }
-                result["options"].append(next_option)
-                next_option = {
-                    "value": invoice.number_id,
+                    "value": "Factura {}".format(invoice.number_id),
                     "href": "/invoice/{}".format(invoice.id),
                     "active": True,
                 }

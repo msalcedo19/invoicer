@@ -38,11 +38,12 @@ def find_ranges(sheet: Worksheet) -> List[tuple]:
             and "NOM CONTRAT" in row_data.value
         ):
             start_num = int(row_data.row)
-            result.append((start_num, start_num + 3, start_num + 5, start_num + 35))
+            result.append((start_num, start_num + 2, start_num + 4, start_num + 34))
     return result
 
+
 async def process_file(
-    file_path: str, invoice_id: int, col_letter: str = "G"
+    file_path: str, invoice_id: int, bill_to_id: int, col_letter: str = "F"
 ) -> schemas.File:
     try:
         xlsx_file = Path(file_path)
@@ -58,10 +59,10 @@ async def process_file(
                 for row in sheet.iter_rows(min_row=minrow, max_row=maxrow):
                     (row_date, in_time, start_break_time, end_break_time, out_time) = (
                         row[0],
+                        row[1],
                         row[2],
                         row[3],
                         row[4],
-                        row[5],
                     )
                     date_1 = check_dates(row_date.value, in_time.value)
                     date_2 = check_dates(
@@ -86,16 +87,14 @@ async def process_file(
                     )
                     index += 1
 
-                sheet[
-                    "{}{}".format(col_letter, maxrow + 1)
-                ] = "=SUM({}{}:{}{})".format(col_letter, minrow, col_letter, maxrow)
+                sheet["{}{}".format(col_letter, maxrow + 1)] = "=SUM({}{}:{}{})".format(
+                    col_letter, minrow, col_letter, maxrow
+                )
                 middlerow = minrow + 14
-                sheet[
-                    "{}{}".format(col_letter, maxrow + 2)
-                ] = "=SUM({}{}:{}{})".format(col_letter, minrow, col_letter, middlerow)
-                sheet[
-                    "{}{}".format(col_letter, maxrow + 3)
-                ] = "=SUM({}{}:{}{})".format(
+                sheet["{}{}".format(col_letter, maxrow + 2)] = "=SUM({}{}:{}{})".format(
+                    col_letter, minrow, col_letter, middlerow
+                )
+                sheet["{}{}".format(col_letter, maxrow + 3)] = "=SUM({}{}:{}{})".format(
                     col_letter, middlerow + 1, col_letter, maxrow
                 )
 
@@ -113,6 +112,7 @@ async def process_file(
                 "s3_pdf_url": None,
                 "created": datetime.now(),
                 "invoice_id": invoice_id,
+                "bill_to_id": bill_to_id,
             }
         )
         new_file = crud.create_file(db=next(get_db()), model=file_obj)
@@ -143,8 +143,6 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             db=conn, model_id=event.data.invoice_id
         )
         file_obj: schemas.File = crud.get_file(db=conn, model_id=event.data.file_id)
-        contract_obj = crud.get_contract(db=conn, model_id=invoice_obj.contract_id)
-        price_unit = contract_obj.price_unit
         for file in event.data.files_to_process:
             xlsx_file = Path(file)
             wb_obj = openpyxl.load_workbook(xlsx_file)
@@ -155,30 +153,42 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                 for range_of in ranges:
                     (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
                     contract_dict = {}
-                    for row in sheet.iter_rows(min_row=minrowinfo, max_row=maxrowinfo, max_col=10):
+                    for row in sheet.iter_rows(
+                        min_row=minrowinfo, max_row=maxrowinfo, max_col=10
+                    ):
                         cell = row[0].value
                         if cell:
                             if "NOM CONTRAT" in cell:
                                 contract_dict["title"] = row[2].value
-                            elif "PÉRIODE" in cell:
-                                contract_dict["period"] = row[2].value
+                            elif "HEURE" in cell:
+                                contract_dict["price_unit"] = row[2].value
+                            elif "MONTANT" in cell:
+                                contract_dict["total_amount"] = row[2].value
                     hours = 0
                     for col in range(minrow, maxrow):
                         hours += int(sheet["{}{}".format(col_letter, col)].value)
+
+                    price_unit = contract_dict.get("price_unit", None)
+                    amount = 0
+                    if not price_unit:
+                        amount = int(contract_dict.get("total_amount", 1))
+                        price_unit = round(amount / hours, 2)
+                    else:
+                        amount = hours * int(price_unit)
+
                     contract_dict["hours"] = hours
                     contract_dict["currency"] = currency
-                    contract_dict["amount"] = contract_dict["hours"] * price_unit
+                    contract_dict["amount"] = amount
                     contract_dict["price_unit"] = price_unit
                     contract_dict["file_id"] = event.data.file_id
+                    contract_dict["invoice_id"] = event.data.invoice_id
                     service_created = schemas.ServiceCreate(**contract_dict)
                     crud.create_service(db=next(get_db()), model=service_created)
 
-        
         data_event = PdfToProcessEvent(
             invoice=invoice_obj,
             file=file_obj,
             html_template_name="template01.html",
-            contract=contract_obj
         )
         await publish(data_event)
         event_handled = True

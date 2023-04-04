@@ -30,16 +30,13 @@ def patch_customer(model_update: dict, model_id: int, db: Session = Depends(get_
 
 @router.delete("/customer/{customer_id}", status_code=status.HTTP_200_OK)
 def delete_customer(customer_id: int, db: Session = Depends(get_db)):
-    contracts = crud.get_contracts_by_customer(db=db, model_id=customer_id)
-    for contract in contracts:
-        invoices = crud.get_invoices_by_contract(db=db, model_id=contract.id)
-        for invoice in invoices:
-            files = crud.get_files_by_invoice(db=db, model_id=invoice.id)
-            for file in files:
-                crud.delete_services_by_file(db=db, model_id=file.id)
-            crud.delete_files_by_invoice(db=db, model_id=invoice.id)
-        crud.delete_invoices_by_contract(db=db, model_id=contract.id)
-    crud.delete_contracts_by_customer(db=db, model_id=customer_id)
+    invoices = crud.get_invoices_by_customer(db=db, model_id=customer_id)
+    for invoice in invoices:
+        files = crud.get_files_by_invoice(db=db, model_id=invoice.id)
+        for file in files:
+            crud.delete_services_by_file(db=db, model_id=file.id)
+        crud.delete_files_by_invoice(db=db, model_id=invoice.id)
+    crud.delete_invoices_by_customer(db=db, model_id=customer_id)
     return crud.delete_customer(db=db, model_id=customer_id)
 
 

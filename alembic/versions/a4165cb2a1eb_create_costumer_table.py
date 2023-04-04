@@ -10,7 +10,6 @@ from alembic import op
 import sqlalchemy as sa
 from ms_invoicer.sql_app.models import (
     Customer,
-    Contract,
     Globals,
     TopInfo,
     Invoice,
@@ -31,21 +30,6 @@ def upgrade() -> None:
         Customer.__tablename__,
         sa.Column("id", sa.Integer, primary_key=True),
         sa.Column("name", sa.String(50), nullable=False),
-    )
-
-    op.create_table(
-        Contract.__tablename__,
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("name", sa.String(50), nullable=False),
-        sa.Column("price_unit", sa.Integer, nullable=True),
-        sa.Column("customer_id", sa.Integer, nullable=False),
-    )
-    op.create_foreign_key(
-        "fk_customer_id",
-        Contract.__tablename__,
-        Customer.__tablename__,
-        ["customer_id"],
-        ["id"],
     )
 
     top_info_table = op.create_table(
@@ -77,14 +61,13 @@ def upgrade() -> None:
         sa.Column("tax_2", sa.Integer, nullable=False),
         sa.Column("created", sa.DateTime, nullable=False),
         sa.Column("updated", sa.DateTime, nullable=False),
-        sa.Column("contract_id", sa.Integer, nullable=False),
-        sa.Column("bill_to_id", sa.Integer, nullable=False),
+        sa.Column("customer_id", sa.Integer, nullable=False),
     )
     op.create_foreign_key(
         "fk_customer_id",
         Invoice.__tablename__,
-        Contract.__tablename__,
-        ["contract_id"],
+        Customer.__tablename__,
+        ["customer_id"],
         ["id"],
     )
 
@@ -96,13 +79,6 @@ def upgrade() -> None:
         sa.Column("phone", sa.String(50), nullable=False),
         sa.Column("email", sa.String(50), nullable=False),
     )
-    op.create_foreign_key(
-        "fk_bill_to_id",
-        Invoice.__tablename__,
-        BillTo.__tablename__,
-        ["bill_to_id"],
-        ["id"],
-    )
 
     op.create_table(
         File.__tablename__,
@@ -111,12 +87,20 @@ def upgrade() -> None:
         sa.Column("s3_pdf_url", sa.String(256), nullable=True),
         sa.Column("created", sa.DateTime, nullable=False),
         sa.Column("invoice_id", sa.Integer, nullable=True),
+        sa.Column("bill_to_id", sa.Integer, nullable=False),
     )
     op.create_foreign_key(
         "fk_invoice_id",
         File.__tablename__,
         Invoice.__tablename__,
         ["invoice_id"],
+        ["id"],
+    )
+    op.create_foreign_key(
+        "fk_bill_to_id",
+        File.__tablename__,
+        BillTo.__tablename__,
+        ["bill_to_id"],
         ["id"],
     )
 
@@ -127,8 +111,16 @@ def upgrade() -> None:
         sa.Column("amount", sa.Integer, nullable=False),
         sa.Column("currency", sa.String(32), nullable=False),
         sa.Column("hours", sa.Integer, nullable=False),
-        sa.Column("price_unit", sa.Integer, nullable=False),
+        sa.Column("price_unit", sa.Double, nullable=False),
         sa.Column("file_id", sa.Integer, nullable=True),
+        sa.Column("invoice_id", sa.Integer, nullable=False),
+    )
+    op.create_foreign_key(
+        "fk_invoice_id",
+        Service.__tablename__,
+        Invoice.__tablename__,
+        ["invoice_id"],
+        ["id"],
     )
     op.create_foreign_key(
         "fk_file_id",
@@ -151,7 +143,7 @@ def upgrade() -> None:
         [
             {
                 "name": "TPS 709597603 RT0001",
-                "value": "10",
+                "value": "9.975",
                 "created": datetime.now(),
                 "updated": datetime.now(),
             },
@@ -172,5 +164,4 @@ def downgrade() -> None:
     op.drop_table(Invoice.__tablename__)
     op.drop_table(BillTo.__tablename__)
     op.drop_table(TopInfo.__tablename__)
-    op.drop_table(Contract.__tablename__)
     op.drop_table(Customer.__tablename__)

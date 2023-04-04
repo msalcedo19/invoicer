@@ -8,9 +8,9 @@ from typing import Union
 router = APIRouter()
 
 
-@router.get("/files/{invoice_id}", response_model=list[schemas.File])
-def get_files_by_invoice(invoice_id: int, db: Session = Depends(get_db)):
-    return crud.get_files_by_invoice(db=db, model_id=invoice_id)
+@router.get("/files/{file_id}", response_model=schemas.File)
+def get_file(file_id: int, db: Session = Depends(get_db)):
+    return crud.get_file(db=db, model_id=file_id)
 
 
 @router.get("/files/", response_model=list[schemas.File])
@@ -36,10 +36,13 @@ def delete_file(model_id: int, db: Session = Depends(get_db)):
 
 @router.post("/upload_file/", response_model=schemas.File)
 async def create_upload_file(
-    invoice_id: str = Form(), file: UploadFile = Form(), db: Session = Depends(get_db)
+    invoice_id: str = Form(),
+    bill_to_id: str = Form(),
+    file: UploadFile = Form(),
+    db: Session = Depends(get_db),
 ):
     file_path = "temp/" + file.filename
     save_file(file_path, file)
 
-    file_created = await process_file(file_path, int(invoice_id))
+    file_created = await process_file(file_path, int(invoice_id), int(bill_to_id))
     return crud.get_file(db=db, model_id=file_created.id)

@@ -8,7 +8,7 @@
       .invoice-box {
         max-width: 800px;
         margin: auto;
-        padding: 80px;
+        padding: 0px;
         border: 1px solid #eee;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
         font-size: 16px;
@@ -66,7 +66,7 @@
         text-align: right;
       }
 
-      .invoice-box table tr.total td:nth-child(5) {
+      .invoice-box table tr.total td:nth-child(4) {
         border-top: 2px solid #eee;
         font-weight: bold;
       }
@@ -128,12 +128,10 @@
 <td>ID</td>
 <td>Service</td>
 <td>Hours</td>
-<td>Price per Hour</td>
-<td>Amount (USD)</td>
+<td>Amount (CAD)</td>
 </tr>
-<div><tr><td>{{service_id0}}</td><td>{{service_txt0}}</td><td>{{num_hours0}}</td><td>{{per_hour0}}</td><td>{{amount0}}</td></tr><tr><td>{{service_id1}}</td><td>{{service_txt1}}</td><td>{{num_hours1}}</td><td>{{per_hour1}}</td><td>{{amount1}}</td></tr><tr><td>{{service_id2}}</td><td>{{service_txt2}}</td><td>{{num_hours2}}</td><td>{{per_hour2}}</td><td>{{amount2}}</td></tr></div>
+<div><tr><td>{{service_id0}}</td><td>{{service_txt0}}</td><td>{{num_hours0}}</td><td>{{amount0}}</td></tr><tr><td>{{service_id1}}</td><td>{{service_txt1}}</td><td>{{num_hours1}}</td><td>{{amount1}}</td></tr><tr><td>{{service_id2}}</td><td>{{service_txt2}}</td><td>{{num_hours2}}</td><td>{{amount2}}</td></tr></div>
 <tr class="total">
-<td></td>
 <td></td>
 <td></td>
 <td class="subtitle_info">Total Avant taxes:</td>
@@ -142,19 +140,16 @@
 <tr class="total">
 <td></td>
 <td></td>
-<td></td>
 <td class="subtitle_info">TPS 709597603 RT0001:</td>
 <td>{{total_tax1}}</td>
 </tr>
 <tr class="total">
 <td></td>
 <td></td>
-<td></td>
 <td class="subtitle_info">TVQ1229793019 TQ0001:</td>
 <td>{{total_tax2}}</td>
 </tr>
 <tr class="total">
-<td></td>
 <td></td>
 <td></td>
 <td class="subtitle_info">Total:</td>
