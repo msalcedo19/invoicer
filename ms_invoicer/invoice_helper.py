@@ -63,6 +63,7 @@ def build_pdf(event: PdfToProcessEvent):
             bill_to_data["to"] = event.file.bill_to.to
             bill_to_data["addr"] = event.file.bill_to.addr
             bill_to_data["phone"] = event.file.bill_to.phone
+            bill_to_data["email"] = event.file.bill_to.email
 
         service_data = {}
         subtotal = 0
@@ -80,7 +81,7 @@ def build_pdf(event: PdfToProcessEvent):
         total_tax_2 = (event.invoice.tax_2/100) * subtotal
         total = total_tax_1 + total_tax_2 + subtotal
         context = {
-            "invoice_id": event.invoice.id,
+            "invoice_id": event.invoice.number_id,
             "created": event.invoice.created,
             "total_no_taxes": round(subtotal, 2),
             "total_tax1": round(total_tax_1, 2),
@@ -100,7 +101,7 @@ def build_pdf(event: PdfToProcessEvent):
         date_now = datetime.now()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
         output_pdf_path: str = "temp/pdf/{}".format(filename)
-        config = pdfkit.configuration(wkhtmltopdf="/usr/local/bin/wkhtmltopdf") #TODO: Modificar en la máquina
+        config = pdfkit.configuration(wkhtmltopdf="/usr/bin/wkhtmltopdf") #TODO: Modificar en la máquina
         pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
         s3_pdf_url = upload_file(file_path=output_pdf_path, file_name=filename)
