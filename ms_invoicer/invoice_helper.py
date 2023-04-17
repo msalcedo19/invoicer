@@ -4,17 +4,28 @@ import os
 import bs4
 import jinja2
 import pdfkit
+
 from ms_invoicer.file_helpers import upload_file
-from ms_invoicer.dao import PdfToProcessEvent
+from ms_invoicer.dao import PdfToProcessEvent, GenerateFinalPDF
 from ms_invoicer.sql_app import crud
 from ms_invoicer.db_pool import get_db
-
+from ms_invoicer.config import WKHTMLTOPDF_PATH
 from uuid import uuid4
+
+from openpyxl import load_workbook
+from pypdf import PdfMerger
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, PageBreak
+from ms_invoicer.file_helpers import find_ranges
+
+from ms_invoicer.event_bus import publish
+from ms_invoicer.db_pool import get_db
 
 base = os.path.dirname(os.path.dirname(__file__))
 
 
-def build_pdf(event: PdfToProcessEvent):
+async def build_pdf(event: PdfToProcessEvent):
     assert event.html_template_name.endswith(".html")
     assert event.file.bill_to is not None
     assert len(event.file.services) != 0
@@ -69,18 +80,25 @@ def build_pdf(event: PdfToProcessEvent):
         subtotal = 0
         index = 0
         for service in event.file.services:
-            service_data["service_id{}".format(index)] = index+1
+            service_data["service_id{}".format(index)] = index + 1
             service_data["service_txt{}".format(index)] = service.title
             service_data["num_hours{}".format(index)] = service.hours
-            #service_data["per_hour{}".format(index)] = service.price_unit
+            # service_data["per_hour{}".format(index)] = service.price_unit
             service_data["amount{}".format(index)] = service.amount
             subtotal += service.amount
             index += 1
 
-        total_tax_1 = (event.invoice.tax_1/100) * subtotal
-        total_tax_2 = (event.invoice.tax_2/100) * subtotal
+        total_tax_1 = (event.invoice.tax_1 / 100) * subtotal
+        total_tax_2 = (event.invoice.tax_2 / 100) * subtotal
         total = total_tax_1 + total_tax_2 + subtotal
+
+        title_company = "Company"
+        empresa_variable = crud.get_global(db=connection, global_name="Empresa")
+        if empresa_variable:
+            title_company = empresa_variable.value
+
         context = {
+            "title_company": title_company,
             "invoice_id": event.invoice.number_id,
             "created": event.invoice.created,
             "total_no_taxes": round(subtotal, 2),
@@ -101,13 +119,96 @@ def build_pdf(event: PdfToProcessEvent):
         date_now = datetime.now()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
         output_pdf_path: str = "temp/pdf/{}".format(filename)
-        config = pdfkit.configuration(wkhtmltopdf="/usr/bin/wkhtmltopdf") #TODO: Modificar en la máquina
+        config = pdfkit.configuration(
+            wkhtmltopdf=WKHTMLTOPDF_PATH
+        )  # TODO: Modificar en la máquina
         pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
-        s3_pdf_url = upload_file(file_path=output_pdf_path, file_name=filename)
-        crud.patch_file(
-            db=connection,
-            model_id=event.file.id,
-            update_dict={"s3_pdf_url": s3_pdf_url},
+        data_event = GenerateFinalPDF(
+            pdf_tables="temp/pdf_tables.pdf",
+            xlsx_url=event.xlsx_url,
+            pdf_invoice=output_pdf_path,
+            filename=filename,
+            file_id=event.file.id
         )
+        await publish(data_event)
         return True
+
+
+def generate_invoice(event: GenerateFinalPDF):
+    # Define the page size
+    page_size = letter
+
+    # Define the table style
+    table_style = TableStyle(
+        [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#333333")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#ffffff")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 12),
+            ("LEADING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f2f2f2")),
+            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#333333")),
+            ("GRID", (0, 0), (-1, 0), 2, colors.HexColor("#333333")),
+            ("GRID", (0, 1), (-1, -1), 1, colors.HexColor("#333333")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]
+    )
+
+    # Create the PDF document
+    doc = SimpleDocTemplate(event.path_pdf_tables, pagesize=page_size)
+    elements = []
+
+    # Load the Excel workbook
+    wb = load_workbook(filename=event.xlsx_url)
+
+    # Select the worksheet with the table
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+
+        ranges = find_ranges(ws)
+        for range_of in ranges:
+            (_, _, minrow, maxrow) = range_of
+
+            # -1 because the headers
+            # Extract the table data as a list of rows
+            table_data = []
+            for row in ws.iter_rows(
+                min_row=minrow - 1, max_row=maxrow, max_col=6, values_only=True
+            ):
+                row_data = []
+                for cell in row:
+                    if isinstance(cell, datetime):
+                        cell_value = cell.strftime("%Y-%m-%d")
+                    else:
+                        cell_value = cell
+                    row_data.append(cell_value)
+                table_data.append(row_data)
+
+            # Add the table to the PDF document
+            table = Table(table_data)
+            table.setStyle(table_style)
+            elements.append(table)
+
+            # Add a page break after the table
+            elements.append(PageBreak())
+
+    # Build and save the PDF document
+    doc.build(elements)
+
+    merger = PdfMerger()
+    for pdf in [event.path_pdf_invoice, event.path_pdf_tables]:
+        merger.append(pdf)
+    merger.write(event.path_pdf_invoice)
+    merger.close()
+
+    s3_pdf_url = upload_file(file_path=event.path_pdf_invoice, file_name=event.filename)
+    conn = next(get_db())
+    crud.patch_file(
+        db=conn,
+        model_id=event.file_id,
+        update_dict={"s3_pdf_url": s3_pdf_url},
+    )
+    return True

@@ -29,6 +29,31 @@ def save_file(file_path: str, file: UploadFile):
 
 
 def find_ranges(sheet: Worksheet) -> List[tuple]:
+    """
+    This function takes an Excel worksheet (using the openpyxl library) as input,
+    searches for a specific string in the first column of the sheet, and returns
+    a list of tuples representing the row ranges that contain the string.
+
+    Input:
+
+    sheet: an Excel worksheet object (type: Worksheet)
+
+    Output:
+
+    A list of tuples, where each tuple contains four integers representing the
+    starting and ending rows of a range that contains the target string.
+
+    Functionality:
+
+    The function iterates through each row of the given worksheet, stopping at
+    row 200 and column 10. For each row, it checks the value of the first cell
+    (column A). If the value is a non-empty string containing the text "NOM CONTRAT",
+    the function records the starting row number and adds a tuple to the result list.
+    The tuple contains the starting row number, the row number 2 rows below the
+    starting row, the row number 4 rows below the starting row, and the row number
+    34 rows below the starting row. These row numbers are calculated based on the
+    assumption that each contract occupies 31 rows (31 days in a month).
+    """
     result = []
     for row in sheet.iter_rows(max_col=10, max_row=200):
         row_data: Cell = row[0]
@@ -100,7 +125,7 @@ async def process_file(
 
         date_now = datetime.now()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
-        file_path = "temp/{}".format(filename)
+        file_path = "temp/xlsx/{}".format(filename)
         wb_obj.save(file_path)
 
         price_unit = 1
@@ -117,7 +142,7 @@ async def process_file(
         )
         new_file = crud.create_file(db=next(get_db()), model=file_obj)
         data_event = FilesToProcessData(
-            files_to_process=[file_path],
+            file_path=file_path,
             file_id=new_file.id,
             invoice_id=invoice_id,
             price_unit=price_unit,
@@ -134,61 +159,61 @@ async def process_file(
 
 async def extract_data(event: FilesToProcessEvent) -> bool:
     event_handled = False
+    conn = next(get_db())
     try:
         col_letter = event.data.col_letter
         currency = event.data.currency
 
-        conn = next(get_db())
         invoice_obj: schemas.Invoice = crud.get_invoice(
             db=conn, model_id=event.data.invoice_id
         )
         file_obj: schemas.File = crud.get_file(db=conn, model_id=event.data.file_id)
-        for file in event.data.files_to_process:
-            xlsx_file = Path(file)
-            wb_obj = openpyxl.load_workbook(xlsx_file)
-            for sheet_name in wb_obj.sheetnames:
-                sheet = wb_obj[sheet_name]
+        xlsx_file = Path(event.data.xlsx_url)
+        wb_obj = openpyxl.load_workbook(xlsx_file)
+        for sheet_name in wb_obj.sheetnames:
+            sheet = wb_obj[sheet_name]
 
-                ranges = find_ranges(sheet)
-                for range_of in ranges:
-                    (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
-                    contract_dict = {}
-                    for row in sheet.iter_rows(
-                        min_row=minrowinfo, max_row=maxrowinfo, max_col=10
-                    ):
-                        cell = row[0].value
-                        if cell:
-                            if "NOM CONTRAT" in cell:
-                                contract_dict["title"] = row[2].value
-                            elif "HEURE" in cell:
-                                contract_dict["price_unit"] = row[2].value
-                            elif "MONTANT" in cell:
-                                contract_dict["total_amount"] = row[2].value
-                    hours = 0
-                    for col in range(minrow, maxrow):
-                        hours += int(sheet["{}{}".format(col_letter, col)].value)
+            ranges = find_ranges(sheet)
+            for range_of in ranges:
+                (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
+                contract_dict = {}
+                for row in sheet.iter_rows(
+                    min_row=minrowinfo, max_row=maxrowinfo, max_col=10
+                ):
+                    cell = row[0].value
+                    if cell:
+                        if "NOM CONTRAT" in cell:
+                            contract_dict["title"] = row[2].value
+                        elif "HEURE" in cell:
+                            contract_dict["price_unit"] = row[2].value
+                        elif "MONTANT" in cell:
+                            contract_dict["total_amount"] = row[2].value
+                hours = 0
+                for col in range(minrow, maxrow):
+                    hours += int(sheet["{}{}".format(col_letter, col)].value)
 
-                    price_unit = contract_dict.get("price_unit", None)
-                    amount = 0
-                    if not price_unit:
-                        amount = int(contract_dict.get("total_amount", 1))
-                        price_unit = round(amount / hours, 2)
-                    else:
-                        amount = hours * int(price_unit)
+                price_unit = contract_dict.get("price_unit", None)
+                amount = 0
+                if not price_unit:
+                    amount = int(contract_dict.get("total_amount", 1))
+                    price_unit = round(amount / hours, 2)
+                else:
+                    amount = hours * int(price_unit)
 
-                    contract_dict["hours"] = hours
-                    contract_dict["currency"] = currency
-                    contract_dict["amount"] = amount
-                    contract_dict["price_unit"] = price_unit
-                    contract_dict["file_id"] = event.data.file_id
-                    contract_dict["invoice_id"] = event.data.invoice_id
-                    service_created = schemas.ServiceCreate(**contract_dict)
-                    crud.create_service(db=next(get_db()), model=service_created)
+                contract_dict["hours"] = hours
+                contract_dict["currency"] = currency
+                contract_dict["amount"] = amount
+                contract_dict["price_unit"] = price_unit
+                contract_dict["file_id"] = event.data.file_id
+                contract_dict["invoice_id"] = event.data.invoice_id
+                service_created = schemas.ServiceCreate(**contract_dict)
+                crud.create_service(db=next(get_db()), model=service_created)
 
         data_event = PdfToProcessEvent(
             invoice=invoice_obj,
             file=file_obj,
             html_template_name="template01.html",
+            xlsx_url=event.data.xlsx_url,
         )
         await publish(data_event)
         event_handled = True
@@ -196,6 +221,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
     except Exception as e:
         log.error("Extracting data failed")
         log.error(e)
+        crud.delete_file(db=conn, model_id=event.data.file_id)
         raise
 
 

@@ -10,3 +10,5 @@ pdfkit
 jinja2
 boto3
 awebus
+reportlab
+pypdf

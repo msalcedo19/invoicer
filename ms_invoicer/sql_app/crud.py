@@ -176,9 +176,12 @@ def get_billtos(db: Session, skip: int = 0, limit: int = 100):
 
 
 def patch_billto(db: Session, model_id: int, update_dict: dict):
-    return (
+    result = (
         db.query(models.BillTo).filter(models.BillTo.id == model_id).update(update_dict)
     )
+
+    db.commit()
+    return result
 
 
 def delete_billto(db: Session, model_id: int):

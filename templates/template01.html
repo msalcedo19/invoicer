@@ -3,7 +3,7 @@
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>A simple, clean, and responsive HTML invoice template</title>
+<title>Invoice {{invoice_id}}</title>
 <style>
       .invoice-box {
         max-width: 800px;
@@ -91,7 +91,7 @@
 <div class="invoice-box">
 <table cellpadding="0" cellspacing="0">
 <tr class="top">
-<td class="title" colspan="5">Cm service d’entretien</td>
+<td class="title" colspan="5">{{title_company}}</td>
 </tr>
 <tr>
 <td colspan="5">
@@ -117,8 +117,8 @@
 <td>
                   {{to}}<br/>
                   {{addr}}<br/>
-                  {{phone}}<br/>
-                  {{email}}
+                  {{email}}<br/>
+                  {{phone}}
                 </td>
 <td></td>
 </tr>

@@ -21,6 +21,13 @@ def create_folders():
     else:
         log.info("Folder does exist")
 
+    folder_name = "temp/xlsx"
+    if not os.path.exists(folder_name):
+        log.info("Creating folder {} ...".format(folder_name))
+        os.mkdir(folder_name)
+    else:
+        log.info("Folder does exist")
+
     folder_name = "temp/pdf"
     if not os.path.exists(folder_name):
         log.info("Creating folder {} ...".format(folder_name))

@@ -56,26 +56,6 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
     if current_path:
         parts = current_path.split("/")[1:]
         if len(parts) == 1:
-            if parts[0] == "customer":
-                result = {
-                    "options": [
-                        {
-                            "value": "Clientes",
-                            "href": "/customer",
-                            "active": True,
-                        },
-                    ]
-                }
-            else:
-                result = {
-                    "options": [
-                        {
-                            "value": "Contratos",
-                            "href": "/contract",
-                            "active": True,
-                        },
-                    ]
-                }
             return result
         elif len(parts) == 2:
             for option in result["options"]:
@@ -88,7 +68,7 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                     "active": True,
                 }
                 result["options"].append(next_option)
-            elif parts[0] == "file":
+            elif parts[0] == "files":
                 file = crud.get_file(db=db, model_id=parts[1])
                 invoice = crud.get_invoice(db=db, model_id=file.invoice_id)
                 customer = crud.get_customer(db=db, model_id=invoice.customer_id)
@@ -106,7 +86,7 @@ def build_breadcrumbs(data: dict, db: Session = Depends(get_db)):
                 result["options"].append(next_option)
                 next_option = {
                     "value": "Contratos",
-                    "href": "/file/{}".format(file.id),
+                    "href": "/files/{}".format(file.id),
                     "active": True,
                 }
                 result["options"].append(next_option)
@@ -142,6 +122,12 @@ def get_globals(db: Session = Depends(get_db)):
 @api.patch("/global/{model_id}", response_model=list[schemas.Global])
 def update_global(model: dict, model_id: int, db: Session = Depends(get_db)):
     model["updated"] = datetime.now()
+    global_var = crud.get_global_by_id(db=db, model_id=model_id)
+    if global_var and (
+        global_var.name == "TVQ1229793019 TQ0001"
+        or global_var.name == "TPS 709597603 RT0001"
+    ):
+        model["value"] = model["value"].replace(",", ".")
     result = crud.patch_global(db=db, model_id=model_id, update_dict=model)
     if result:
         return crud.get_globals(db=db)
@@ -157,6 +143,15 @@ def get_services(db: Session = Depends(get_db)):
 @api.post("/bill_to/", response_model=schemas.BillTo)
 def create_bill_to(model: schemas.BillToCreate, db: Session = Depends(get_db)):
     return crud.create_billto(db=db, model=model)
+
+
+@api.patch("/bill_to/{model_id}", response_model=schemas.BillTo)
+def update_billTo(model: dict, model_id: int, db: Session = Depends(get_db)):
+    result = crud.patch_billto(db=db, model_id=model_id, update_dict=model)
+    if result:
+        return crud.get_billto(db=db, model_id=model_id)
+    else:
+        return None
 
 
 @api.get("/bill_to/", response_model=list[schemas.BillTo])

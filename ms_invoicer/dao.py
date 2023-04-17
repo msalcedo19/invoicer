@@ -4,15 +4,15 @@ from typing import Any, Dict, List
 from ms_invoicer.sql_app.schemas import Invoice, File
 
 class FilesToProcessData():
-    files_to_process: List[Dict[str, Any]]
+    xlsx_url: str
     price_unit: int
     col_letter: str
     currency: str
     file_id: int
     invoice_id: int
 
-    def __init__(self, files_to_process: List[Dict[str, Any]], file_id: int, invoice_id: int, price_unit: int, col_letter: str, currency: str) -> None:
-        self.files_to_process = files_to_process
+    def __init__(self, file_path: str, file_id: int, invoice_id: int, price_unit: int, col_letter: str, currency: str) -> None:
+        self.xlsx_url = file_path
         self.file_id = file_id
         self.invoice_id = invoice_id
         self.price_unit = price_unit
@@ -33,7 +33,20 @@ class PdfToProcessEvent(Event):
     """
     TODO: Add description
     """
-    def __init__(self, invoice: Invoice, file: File, html_template_name: str):
+    def __init__(self, invoice: Invoice, file: File, html_template_name: str, xlsx_url: str):
         self.invoice = invoice
         self.file = file
         self.html_template_name = html_template_name
+        self.xlsx_url = xlsx_url
+
+
+class GenerateFinalPDF(Event):
+    """
+    TODO: Add description
+    """
+    def __init__(self, pdf_tables: str, xlsx_url: str, pdf_invoice: str, filename: str, file_id: int):
+        self.path_pdf_tables = pdf_tables
+        self.xlsx_url = xlsx_url
+        self.path_pdf_invoice = pdf_invoice
+        self.filename = filename
+        self.file_id = file_id

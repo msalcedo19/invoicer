@@ -153,6 +153,12 @@ def upgrade() -> None:
                 "created": datetime.now(),
                 "updated": datetime.now(),
             },
+            {
+                "name": "Empresa",
+                "value": "Cm service d’entretien",
+                "created": datetime.now(),
+                "updated": datetime.now(),
+            },
         ],
     )
 
