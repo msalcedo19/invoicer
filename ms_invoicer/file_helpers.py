@@ -1,22 +1,22 @@
-from datetime import datetime
-from math import floor
-from typing import List
-import openpyxl
-from fastapi import UploadFile
-from pathlib import Path
 import logging
-from ms_invoicer.sql_app import crud, schemas
-from ms_invoicer.utils import check_dates
-from ms_invoicer.dao import FilesToProcessData, FilesToProcessEvent, PdfToProcessEvent
-from ms_invoicer.event_bus import publish
-from ms_invoicer.db_pool import get_db
-from ms_invoicer.config import S3_ACCESS_KEY, S3_SECRET_ACCESS_KEY
-import boto3
-from botocore.exceptions import ClientError
 import os
+from datetime import datetime
+from pathlib import Path
+from typing import List
 from uuid import uuid4
-from openpyxl.worksheet.worksheet import Worksheet
+
+import boto3
+import openpyxl
+from botocore.exceptions import ClientError
+from fastapi import UploadFile
 from openpyxl.cell.cell import Cell
+from openpyxl.worksheet.worksheet import Worksheet
+
+from ms_invoicer.config import S3_ACCESS_KEY, S3_SECRET_ACCESS_KEY
+from ms_invoicer.dao import FilesToProcessData, FilesToProcessEvent, PdfToProcessEvent
+from ms_invoicer.db_pool import get_db
+from ms_invoicer.event_bus import publish
+from ms_invoicer.sql_app import crud, schemas
 
 log = logging.getLogger(__name__)
 
@@ -63,70 +63,22 @@ def find_ranges(sheet: Worksheet) -> List[tuple]:
             and "NOM CONTRAT" in row_data.value
         ):
             start_num = int(row_data.row)
-            result.append((start_num, start_num + 2, start_num + 4, start_num + 34))
+            result.append((start_num, start_num + 2, start_num + 4, start_num + 35))
     return result
 
 
 async def process_file(
-    file_path: str, invoice_id: int, bill_to_id: int, col_letter: str = "F"
+    file: UploadFile,
+    invoice_id: int,
+    bill_to_id: int,
+    current_user_id: int,
+    col_letter: str = "F",
 ) -> schemas.File:
     try:
-        xlsx_file = Path(file_path)
-        wb_obj = openpyxl.load_workbook(xlsx_file)
-
-        for sheet_name in wb_obj.sheetnames:
-            sheet = wb_obj[sheet_name]
-
-            ranges = find_ranges(sheet)
-            for range in ranges:
-                (_, _, minrow, maxrow) = range
-                index = minrow
-                for row in sheet.iter_rows(min_row=minrow, max_row=maxrow):
-                    (row_date, in_time, start_break_time, end_break_time, out_time) = (
-                        row[0],
-                        row[1],
-                        row[2],
-                        row[3],
-                        row[4],
-                    )
-                    date_1 = check_dates(row_date.value, in_time.value)
-                    date_2 = check_dates(
-                        row_date.value, start_break_time.value, in_time.value
-                    )
-                    date_3 = check_dates(
-                        row_date.value, end_break_time.value, in_time.value
-                    )
-                    date_4 = check_dates(row_date.value, out_time.value, in_time.value)
-                    amount = (date_4 - date_3) + (date_3 - date_2) + (date_2 - date_1)
-                    sheet["{}{}".format(col_letter, index)] = floor(
-                        amount.seconds / 3600
-                    )
-                    log.debug(
-                        "date1: {} - date2: {} - date3: {} - date4: {} - result: {}".format(
-                            date_1,
-                            date_2,
-                            date_3,
-                            date_4,
-                            sheet["G{}".format(index)].value,
-                        )
-                    )
-                    index += 1
-
-                sheet["{}{}".format(col_letter, maxrow + 1)] = "=SUM({}{}:{}{})".format(
-                    col_letter, minrow, col_letter, maxrow
-                )
-                middlerow = minrow + 14
-                sheet["{}{}".format(col_letter, maxrow + 2)] = "=SUM({}{}:{}{})".format(
-                    col_letter, minrow, col_letter, middlerow
-                )
-                sheet["{}{}".format(col_letter, maxrow + 3)] = "=SUM({}{}:{}{})".format(
-                    col_letter, middlerow + 1, col_letter, maxrow
-                )
-
         date_now = datetime.now()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
         file_path = "temp/xlsx/{}".format(filename)
-        wb_obj.save(file_path)
+        save_file(file_path, file)
 
         price_unit = 1
         currency = "CAD"
@@ -138,6 +90,7 @@ async def process_file(
                 "created": datetime.now(),
                 "invoice_id": invoice_id,
                 "bill_to_id": bill_to_id,
+                "user_id": current_user_id,
             }
         )
         new_file = crud.create_file(db=next(get_db()), model=file_obj)
@@ -145,6 +98,7 @@ async def process_file(
             file_path=file_path,
             file_id=new_file.id,
             invoice_id=invoice_id,
+            current_user_id=current_user_id,
             price_unit=price_unit,
             col_letter=col_letter,
             currency=currency,
@@ -164,14 +118,10 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
         col_letter = event.data.col_letter
         currency = event.data.currency
 
-        invoice_obj: schemas.Invoice = crud.get_invoice(
-            db=conn, model_id=event.data.invoice_id
-        )
-        file_obj: schemas.File = crud.get_file(db=conn, model_id=event.data.file_id)
         xlsx_file = Path(event.data.xlsx_url)
-        wb_obj = openpyxl.load_workbook(xlsx_file)
+        wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
         for sheet_name in wb_obj.sheetnames:
-            sheet = wb_obj[sheet_name]
+            sheet: Cell = wb_obj[sheet_name]
 
             ranges = find_ranges(sheet)
             for range_of in ranges:
@@ -190,7 +140,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                             contract_dict["total_amount"] = row[2].value
                 hours = 0
                 for col in range(minrow, maxrow):
-                    hours += int(sheet["{}{}".format(col_letter, col)].value)
+                    hours += float(sheet["{}{}".format(col_letter, col)].value)
 
                 price_unit = contract_dict.get("price_unit", None)
                 amount = 0
@@ -198,7 +148,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                     amount = int(contract_dict.get("total_amount", 1))
                     price_unit = round(amount / hours, 2)
                 else:
-                    amount = hours * int(price_unit)
+                    amount = hours * float(price_unit)
 
                 contract_dict["hours"] = hours
                 contract_dict["currency"] = currency
@@ -206,10 +156,22 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                 contract_dict["price_unit"] = price_unit
                 contract_dict["file_id"] = event.data.file_id
                 contract_dict["invoice_id"] = event.data.invoice_id
+                contract_dict["user_id"] = event.data.current_user_id
                 service_created = schemas.ServiceCreate(**contract_dict)
-                crud.create_service(db=next(get_db()), model=service_created)
+                crud.create_service(db=conn, model=service_created)
 
+        invoice_obj: schemas.Invoice = crud.get_invoice(
+            db=conn,
+            model_id=event.data.invoice_id,
+            current_user_id=event.data.current_user_id,
+        )
+        file_obj: schemas.File = crud.get_file(
+            db=conn,
+            model_id=event.data.file_id,
+            current_user_id=event.data.current_user_id,
+        )
         data_event = PdfToProcessEvent(
+            current_user_id=event.data.current_user_id,
             invoice=invoice_obj,
             file=file_obj,
             html_template_name="template01.html",
@@ -221,7 +183,6 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
     except Exception as e:
         log.error("Extracting data failed")
         log.error(e)
-        crud.delete_file(db=conn, model_id=event.data.file_id)
         raise
 
 

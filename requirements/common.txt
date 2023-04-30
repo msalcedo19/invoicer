@@ -12,3 +12,7 @@ boto3
 awebus
 reportlab
 pypdf
+python-jose[cryptography]
+passlib
+bcrypt
+isort

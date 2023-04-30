@@ -1,20 +1,30 @@
 from ms_invoicer.event_bus import Event
-from typing import Any, Dict, List
+from ms_invoicer.sql_app.schemas import File, Invoice
 
-from ms_invoicer.sql_app.schemas import Invoice, File
 
-class FilesToProcessData():
+class FilesToProcessData:
     xlsx_url: str
     price_unit: int
     col_letter: str
     currency: str
     file_id: int
     invoice_id: int
+    current_user_id: int
 
-    def __init__(self, file_path: str, file_id: int, invoice_id: int, price_unit: int, col_letter: str, currency: str) -> None:
+    def __init__(
+        self,
+        file_path: str,
+        file_id: int,
+        invoice_id: int,
+        current_user_id: int,
+        price_unit: int,
+        col_letter: str,
+        currency: str,
+    ) -> None:
         self.xlsx_url = file_path
         self.file_id = file_id
         self.invoice_id = invoice_id
+        self.current_user_id = current_user_id
         self.price_unit = price_unit
         self.col_letter = col_letter
         self.currency = currency
@@ -33,7 +43,16 @@ class PdfToProcessEvent(Event):
     """
     TODO: Add description
     """
-    def __init__(self, invoice: Invoice, file: File, html_template_name: str, xlsx_url: str):
+
+    def __init__(
+        self,
+        current_user_id: int,
+        invoice: Invoice,
+        file: File,
+        html_template_name: str,
+        xlsx_url: str,
+    ):
+        self.current_user_id = current_user_id
         self.invoice = invoice
         self.file = file
         self.html_template_name = html_template_name
@@ -44,7 +63,17 @@ class GenerateFinalPDF(Event):
     """
     TODO: Add description
     """
-    def __init__(self, pdf_tables: str, xlsx_url: str, pdf_invoice: str, filename: str, file_id: int):
+
+    def __init__(
+        self,
+        current_user_id: int,
+        pdf_tables: str,
+        xlsx_url: str,
+        pdf_invoice: str,
+        filename: str,
+        file_id: int,
+    ):
+        self.current_user_id = current_user_id
         self.path_pdf_tables = pdf_tables
         self.xlsx_url = xlsx_url
         self.path_pdf_invoice = pdf_invoice

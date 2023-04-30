@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+
 def test_customer(test_client: TestClient):
     payload = {
         "name": "customer1",

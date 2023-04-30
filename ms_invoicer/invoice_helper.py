@@ -1,26 +1,23 @@
-from datetime import datetime
-from bs4 import BeautifulSoup
 import os
+from datetime import datetime
+from uuid import uuid4
+
 import bs4
 import jinja2
 import pdfkit
-
-from ms_invoicer.file_helpers import upload_file
-from ms_invoicer.dao import PdfToProcessEvent, GenerateFinalPDF
-from ms_invoicer.sql_app import crud
-from ms_invoicer.db_pool import get_db
-from ms_invoicer.config import WKHTMLTOPDF_PATH
-from uuid import uuid4
-
+from bs4 import BeautifulSoup
 from openpyxl import load_workbook
 from pypdf import PdfMerger
-from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, PageBreak
-from ms_invoicer.file_helpers import find_ranges
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import PageBreak, SimpleDocTemplate, Table, TableStyle
 
-from ms_invoicer.event_bus import publish
+from ms_invoicer.config import WKHTMLTOPDF_PATH
+from ms_invoicer.dao import GenerateFinalPDF, PdfToProcessEvent
 from ms_invoicer.db_pool import get_db
+from ms_invoicer.event_bus import publish
+from ms_invoicer.file_helpers import find_ranges, upload_file
+from ms_invoicer.sql_app import crud
 
 base = os.path.dirname(os.path.dirname(__file__))
 
@@ -61,7 +58,9 @@ async def build_pdf(event: PdfToProcessEvent):
             file.write(str(soup))
 
         top_info_data = {}
-        top_info = crud.get_topinfos(db=connection)
+        top_info = crud.get_topinfos(
+            db=connection, current_user_id=event.current_user_id
+        )
         if len(top_info) > 0:
             top_info = top_info[0]
             top_info_data["top_info_from"] = top_info.ti_from
@@ -93,7 +92,9 @@ async def build_pdf(event: PdfToProcessEvent):
         total = total_tax_1 + total_tax_2 + subtotal
 
         title_company = "Company"
-        empresa_variable = crud.get_global(db=connection, global_name="Empresa")
+        empresa_variable = crud.get_global(
+            db=connection, global_name="Empresa", current_user_id=event.current_user_id
+        )
         if empresa_variable:
             title_company = empresa_variable.value
 
@@ -125,11 +126,12 @@ async def build_pdf(event: PdfToProcessEvent):
         pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
         data_event = GenerateFinalPDF(
+            current_user_id=event.current_user_id,
             pdf_tables="temp/pdf_tables.pdf",
             xlsx_url=event.xlsx_url,
             pdf_invoice=output_pdf_path,
             filename=filename,
-            file_id=event.file.id
+            file_id=event.file.id,
         )
         await publish(data_event)
         return True
@@ -162,7 +164,7 @@ def generate_invoice(event: GenerateFinalPDF):
     elements = []
 
     # Load the Excel workbook
-    wb = load_workbook(filename=event.xlsx_url)
+    wb = load_workbook(filename=event.xlsx_url, data_only=True)
 
     # Select the worksheet with the table
     for sheet_name in wb.sheetnames:
@@ -210,5 +212,6 @@ def generate_invoice(event: GenerateFinalPDF):
         db=conn,
         model_id=event.file_id,
         update_dict={"s3_pdf_url": s3_pdf_url},
+        current_user_id=event.current_user_id,
     )
     return True

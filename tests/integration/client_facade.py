@@ -5,7 +5,6 @@ from typing import Any, Dict
 
 import requests
 
-
 """
 This module is meant to abstract the type of client used for testing.
 FastAPI's TestClient works directly against the api.py module, bypassing

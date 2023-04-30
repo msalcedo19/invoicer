@@ -1,9 +1,47 @@
 from datetime import datetime
 from typing import List, Union
+
 from pydantic import BaseModel
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Union[str, None] = None
+
+class UserBase(BaseModel):
+    username: str
+    hashpass: str
+    created: datetime
+    updated: datetime
+
+
+class UserCreate(UserBase):
+    pass
+
+class UserAuthenticate(BaseModel):
+    username: str
+    password: str
+
+
+class UserAuthenticateResponse(BaseModel):
+    username: str
+    token: str
+
+
+class User(BaseModel):
+    id: int
+    username: str
+
+    class Config:
+        orm_mode = True
+
+
 class GlobalBase(BaseModel):
+    identifier: int
     name: str
     value: str
     created: datetime
@@ -11,7 +49,7 @@ class GlobalBase(BaseModel):
 
 
 class GlobalCreate(GlobalBase):
-    pass
+    user_id: int
 
 
 class Global(GlobalBase):
@@ -25,14 +63,14 @@ class ServiceBase(BaseModel):
     title: str
     amount: int
     currency: str
-    hours: int
+    hours: float
     price_unit: float
     file_id: int
     invoice_id: int
 
 
 class ServiceCreate(ServiceBase):
-    pass
+    user_id: int
 
 
 class Service(ServiceBase):
@@ -50,7 +88,7 @@ class BillToBase(BaseModel):
 
 
 class BillToCreate(BillToBase):
-    pass
+    user_id: int
 
 
 class BillTo(BillToBase):
@@ -68,7 +106,7 @@ class TopInfoBase(BaseModel):
 
 
 class TopInfoCreate(TopInfoBase):
-    pass
+    user_id: int
 
 
 class TopInfo(TopInfoBase):
@@ -87,7 +125,7 @@ class FileBase(BaseModel):
 
 
 class FileCreate(FileBase):
-    pass
+    user_id: int
 
 
 class CustomerBase(BaseModel):
@@ -95,7 +133,7 @@ class CustomerBase(BaseModel):
 
 
 class CustomerCreate(CustomerBase):
-    pass
+    user_id: int
 
 
 class CustomerLite(CustomerBase):
@@ -117,7 +155,7 @@ class InvoiceBase(BaseModel):
 
 
 class InvoiceCreate(InvoiceBase):
-    pass
+    user_id: int
 
 
 class InvoiceLite(InvoiceBase):
@@ -125,6 +163,7 @@ class InvoiceLite(InvoiceBase):
 
     class Config:
         orm_mode = True
+
 
 class File(FileBase):
     id: int
@@ -141,6 +180,7 @@ class Invoice(InvoiceBase):
 
     class Config:
         orm_mode = True
+
 
 class Customer(CustomerBase):
     id: int
