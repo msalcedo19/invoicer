@@ -1,6 +1,6 @@
 from typing import List, Union
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
 from ms_invoicer.db_pool import get_db
@@ -16,9 +16,17 @@ def post_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    obj_dict = invoice.dict()
-    obj_dict["user_id"] = current_user.id
-    return crud.create_invoice(db=db, model=schemas.InvoiceCreate(**obj_dict))
+    result = crud.get_invoices_by_number_id(
+        db=db, number_id=invoice.number_id, current_user_id=current_user.id
+    )
+    if not result:
+        obj_dict = invoice.dict()
+        obj_dict["user_id"] = current_user.id
+        return crud.create_invoice(db=db, model=schemas.InvoiceCreate(**obj_dict))
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Existe una factura con ese numéro de factura",
+    )
 
 
 @router.patch("/invoice/{model_id}", response_model=Union[schemas.Invoice, None])

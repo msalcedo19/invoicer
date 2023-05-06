@@ -1,4 +1,5 @@
 import logging
+from math import ceil
 import os
 from datetime import datetime
 from pathlib import Path
@@ -63,7 +64,7 @@ def find_ranges(sheet: Worksheet) -> List[tuple]:
             and "NOM CONTRAT" in row_data.value
         ):
             start_num = int(row_data.row)
-            result.append((start_num, start_num + 2, start_num + 4, start_num + 35))
+            result.append((start_num, start_num + 2, start_num + 4, start_num + 34))
     return result
 
 
@@ -140,7 +141,8 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                             contract_dict["total_amount"] = row[2].value
                 hours = 0
                 for col in range(minrow, maxrow):
-                    hours += float(sheet["{}{}".format(col_letter, col)].value)
+                    hour = sheet["{}{}".format(col_letter, col)].value
+                    hours += float(hour)
 
                 price_unit = contract_dict.get("price_unit", None)
                 amount = 0

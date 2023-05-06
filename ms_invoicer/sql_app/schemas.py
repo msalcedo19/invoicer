@@ -147,8 +147,8 @@ class CustomerLite(CustomerBase):
 class InvoiceBase(BaseModel):
     number_id: int
     reason: str
-    tax_1: int
-    tax_2: int
+    tax_1: float
+    tax_2: float
     created: datetime
     updated: datetime
     customer_id: int

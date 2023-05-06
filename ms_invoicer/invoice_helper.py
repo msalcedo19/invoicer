@@ -78,10 +78,13 @@ async def build_pdf(event: PdfToProcessEvent):
         service_data = {}
         subtotal = 0
         index = 0
+        service_info = None
         for service in event.file.services:
+            if not service_info:
+                service_info = service
             service_data["service_id{}".format(index)] = index + 1
             service_data["service_txt{}".format(index)] = service.title
-            service_data["num_hours{}".format(index)] = service.hours
+            service_data["num_hours{}".format(index)] = round(service.hours, 2)
             # service_data["per_hour{}".format(index)] = service.price_unit
             service_data["amount{}".format(index)] = service.amount
             subtotal += service.amount
@@ -118,7 +121,8 @@ async def build_pdf(event: PdfToProcessEvent):
         output_text = template.render(context)
 
         date_now = datetime.now()
-        filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
+        #filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
+        filename = f"factura_{event.invoice.number_id}_{service_info.title}_{date_now.month - 1}_{date_now.year}-{str(uuid4())}.pdf"
         output_pdf_path: str = "temp/pdf/{}".format(filename)
         config = pdfkit.configuration(
             wkhtmltopdf=WKHTMLTOPDF_PATH

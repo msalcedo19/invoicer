@@ -15,8 +15,10 @@ from ms_invoicer.routers import bill_to, contract, customer, files, invoice, use
 from ms_invoicer.security_helper import get_current_user, get_payload_from_header
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import create_folders
+from ms_invoicer.no_upload_utils import populate_db
 
 create_folders()
+populate_db()
 
 api = FastAPI()
 api.add_middleware(
@@ -38,24 +40,6 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 register_event_handlers()
-
-EXCLUDED_ENDPOINTS_FROM_AUTH = ["/authenticate", "/docs", "/openapi.json", "/"]
-
-
-@api.middleware("http")
-async def check_token(request: Request, call_next):
-    try:
-        if request.url.path not in EXCLUDED_ENDPOINTS_FROM_AUTH:
-            get_payload_from_header(request.headers.get("authorization", None))
-        response = await call_next(request)
-        return response
-    except HTTPException as e:
-        return JSONResponse(content={"error": e.detail}, status_code=e.status_code)
-    except ExpiredSignatureError:
-        return JSONResponse(
-            content={"error": "Invalid credentials"},
-            status_code=status.HTTP_401_UNAUTHORIZED,
-        )
 
 
 @api.get("/")

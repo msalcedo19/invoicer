@@ -420,6 +420,17 @@ def get_invoices_by_customer(db: Session, model_id: int, current_user_id: int):
     )
 
 
+def get_invoices_by_number_id(db: Session, number_id: int, current_user_id: int):
+    return (
+        db.query(models.Invoice)
+        .filter(
+            models.Invoice.number_id == number_id
+            and models.Invoice.user_id == current_user_id
+        )
+        .first()
+    )
+
+
 def get_invoices(db: Session, current_user_id: int, skip: int = 0, limit: int = 100):
     return (
         db.query(models.Invoice)
