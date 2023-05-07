@@ -84,7 +84,7 @@ async def build_pdf(event: PdfToProcessEvent):
                 service_info = service
             service_data["service_id{}".format(index)] = index + 1
             service_data["service_txt{}".format(index)] = service.title
-            service_data["num_hours{}".format(index)] = round(service.hours, 2)
+            service_data["num_hours{}".format(index)] = service.hours
             # service_data["per_hour{}".format(index)] = service.price_unit
             service_data["amount{}".format(index)] = service.amount
             subtotal += service.amount
@@ -131,7 +131,7 @@ async def build_pdf(event: PdfToProcessEvent):
 
         data_event = GenerateFinalPDF(
             current_user_id=event.current_user_id,
-            pdf_tables="temp/pdf_tables.pdf",
+            pdf_tables=f"temp/pdf_tables_{event.current_user_id}.pdf",
             xlsx_url=event.xlsx_url,
             pdf_invoice=output_pdf_path,
             filename=filename,
@@ -188,6 +188,8 @@ def generate_invoice(event: GenerateFinalPDF):
                 for cell in row:
                     if isinstance(cell, datetime):
                         cell_value = cell.strftime("%Y-%m-%d")
+                    elif isinstance(cell, float):
+                        cell_value = round(cell, 2)
                     else:
                         cell_value = cell
                     row_data.append(cell_value)

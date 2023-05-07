@@ -2,17 +2,15 @@ import logging
 from datetime import datetime
 from typing import List
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from jose import ExpiredSignatureError
 from sqlalchemy.orm import Session
 
 from ms_invoicer.config import LOG_LEVEL
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.event_handler import register_event_handlers
 from ms_invoicer.routers import bill_to, contract, customer, files, invoice, user
-from ms_invoicer.security_helper import get_current_user, get_payload_from_header
+from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import create_folders
 from ms_invoicer.no_upload_utils import populate_db

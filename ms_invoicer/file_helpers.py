@@ -56,15 +56,28 @@ def find_ranges(sheet: Worksheet) -> List[tuple]:
     assumption that each contract occupies 31 rows (31 days in a month).
     """
     result = []
+    start_num = None
+    end_num = None
     for row in sheet.iter_rows(max_col=10, max_row=200):
         row_data: Cell = row[0]
         if (
             row_data.value
             and isinstance(row_data.value, str)
-            and "NOM CONTRAT" in row_data.value
+            and row_data.value.startswith("NOM CONTRAT")
         ):
             start_num = int(row_data.row)
-            result.append((start_num, start_num + 2, start_num + 4, start_num + 34))
+            # result.append((start_num, start_num + 2, start_num + 4, start_num + 34))
+        elif (
+            row_data.value
+            and isinstance(row_data.value, str)
+            and row_data.value.startswith("TOTAL")
+        ):
+            end_num = int(row_data.row)
+
+        if start_num and end_num:
+            result.append((start_num, start_num + 2, start_num + 4, end_num))
+            start_num = None
+            end_num = None
     return result
 
 
@@ -142,7 +155,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                 hours = 0
                 for col in range(minrow, maxrow):
                     hour = sheet["{}{}".format(col_letter, col)].value
-                    hours += float(hour)
+                    hours += float(round(hour, 2))
 
                 price_unit = contract_dict.get("price_unit", None)
                 amount = 0

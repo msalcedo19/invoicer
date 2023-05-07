@@ -1,1 +1,2 @@
 -r testing.txt
+psycopg2

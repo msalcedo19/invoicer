@@ -24,7 +24,7 @@ def post_invoice(
         obj_dict["user_id"] = current_user.id
         return crud.create_invoice(db=db, model=schemas.InvoiceCreate(**obj_dict))
     raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
+        status_code=status.HTTP_409_CONFLICT,
         detail="Existe una factura con ese numéro de factura",
     )
 
