@@ -138,8 +138,19 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             sheet: Cell = wb_obj[sheet_name]
 
             ranges = find_ranges(sheet)
+            invoice_update = False
             for range_of in ranges:
                 (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
+                if not invoice_update:
+                    crud.patch_invoice(
+                        db=conn,
+                        model_id=event.data.invoice_id,
+                        current_user_id=event.data.current_user_id,
+                        update_dict={
+                            "created": sheet["{}{}".format("A", maxrow - 1)].value
+                        },
+                    )
+                    invoice_update = True
                 contract_dict = {}
                 for row in sheet.iter_rows(
                     min_row=minrowinfo, max_row=maxrowinfo, max_col=10

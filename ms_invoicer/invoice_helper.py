@@ -103,6 +103,7 @@ async def build_pdf(event: PdfToProcessEvent):
 
         context = {
             "title_company": title_company,
+            "invoice_date": event.invoice.created.strftime("%d-%m-%Y"),
             "invoice_id": event.invoice.number_id,
             "created": event.invoice.created,
             "total_no_taxes": round(subtotal, 2),
@@ -122,7 +123,7 @@ async def build_pdf(event: PdfToProcessEvent):
 
         date_now = datetime.now()
         #filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
-        filename = f"factura_{event.invoice.number_id}_{service_info.title}_{date_now.month - 1}_{date_now.year}-{str(uuid4())}.pdf"
+        filename = f"facture_{event.invoice.number_id}_{service_info.title}_{event.invoice.created.strftime('%m_%Y')}-{str(uuid4())}.pdf"
         output_pdf_path: str = "temp/pdf/{}".format(filename)
         config = pdfkit.configuration(
             wkhtmltopdf=WKHTMLTOPDF_PATH
