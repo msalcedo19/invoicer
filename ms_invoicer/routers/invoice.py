@@ -17,7 +17,7 @@ def post_invoice(
     db: Session = Depends(get_db),
 ):
     result = crud.get_invoices_by_number_id(
-        db=db, number_id=invoice.number_id, current_user_id=current_user.id
+        db=db, number_id=invoice.number_id, customer_id=invoice.customer_id, current_user_id=current_user.id
     )
     if not result:
         obj_dict = invoice.dict()

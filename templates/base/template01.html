@@ -58,7 +58,11 @@
       }
 
       .invoice_info {
-        text-align: right;
+        text-align: left;
+      }
+
+      .nowrap-text {
+        white-space: nowrap;
       }
 
       .subtitle_info {
@@ -98,14 +102,15 @@
           <td colspan="5">
             <table>
               <tr>
-                <td>
-                  {{top_info_from}}<br/>
-                  {{top_info_addr}}<br/>
-                  {{top_info_email}}<br/>
+                <td class="nowrap-text">
+                  {{top_info_from}}<br />
+                  {{top_info_addr}}<br />
+                  {{top_info_email}}<br />
                   {{top_info_phone}}
                 </td>
 
-                <td class="invoice_info">
+                <td style="width: 100%"></td>
+                <td class="invoice_info nowrap-text">
                   Invoice #: {{invoice_id}}<br />
                   Fecha: {{invoice_date}}<br />
                 </td>
