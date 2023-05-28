@@ -13,7 +13,7 @@ from ms_invoicer.routers import bill_to, contract, customer, files, invoice, use
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import create_folders
-from ms_invoicer.no_upload_utils import populate_db
+from ms_invoicer.no_upload_helper import populate_db
 
 create_folders()
 populate_db()
@@ -131,14 +131,14 @@ def build_breadcrumbs(
     return result
 
 
-@api.get("/global/{global_name}", response_model=schemas.Global)
+@api.get("/global/{identifier}", response_model=schemas.Global)
 def get_global(
-    global_name: str,
+    identifier: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     return crud.get_global(
-        db=db, global_name=global_name, current_user_id=current_user.id
+        db=db, identifier=identifier, current_user_id=current_user.id
     )
 
 

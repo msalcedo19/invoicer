@@ -213,7 +213,11 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
 
 
 def upload_file(
-    file_path: str, file_name: str, bucket="invoicer-files-dev", object_name=None
+    file_path: str,
+    file_name: str,
+    bucket="invoicer-files-dev",
+    object_name=None,
+    is_pdf=False,
 ):
     """Upload a file to an S3 bucket
 
@@ -235,7 +239,19 @@ def upload_file(
         aws_secret_access_key=S3_SECRET_ACCESS_KEY,
     )
     try:
-        s3.upload_file(file_path, bucket, object_name, ExtraArgs={"ACL": "public-read"})
+        args = {"ACL": "public-read"}
+        if is_pdf:
+            args = {
+                "ACL": "public-read",
+                "ContentType": "application/pdf",
+                "ContentDisposition": "inline",
+            }
+        s3.upload_file(
+            file_path,
+            bucket,
+            object_name,
+            ExtraArgs=args,
+        )
         url = "https://" + bucket + ".s3.amazonaws.com/" + file_name
         return url
     except ClientError as e:

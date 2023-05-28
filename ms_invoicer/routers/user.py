@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from ms_invoicer.security_helper import (
     authenticate_user,
     create_access_token,
     get_password_hash,
+    get_current_user,
 )
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.config import ACCESS_TOKEN_EXPIRE_MINUTES
@@ -30,6 +32,24 @@ def authenticate(form_data: OAuth2PasswordRequestForm = Depends()):
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+class PasswordCheckRequest(BaseModel):
+    user_password: str
+
+
+@router.post("/user/check_password")
+def check_password(
+    request: PasswordCheckRequest,
+    current_user: schemas.User = Depends(get_current_user),
+):
+    user = authenticate_user(current_user.username, request.user_password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Incorrect password",
+        )
+    return {"message": "correct password"}
 
 
 @router.post("/user", response_model=schemas.User)

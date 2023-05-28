@@ -96,7 +96,7 @@ async def build_pdf(event: PdfToProcessEvent):
 
         title_company = "Company"
         empresa_variable = crud.get_global(
-            db=connection, global_name="Empresa", current_user_id=event.current_user_id
+            db=connection, identifier=3, current_user_id=event.current_user_id
         )
         if empresa_variable:
             title_company = empresa_variable.value
@@ -122,7 +122,7 @@ async def build_pdf(event: PdfToProcessEvent):
         output_text = template.render(context)
 
         date_now = datetime.now()
-        #filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
+        # filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.pdf"
         filename = f"facture_{event.invoice.number_id}_{service_info.title}_{event.invoice.created.strftime('%m_%Y')}-{str(uuid4())}.pdf"
         output_pdf_path: str = "temp/pdf/{}".format(filename)
         config = pdfkit.configuration(
@@ -213,7 +213,9 @@ def generate_invoice(event: GenerateFinalPDF):
     merger.write(event.path_pdf_invoice)
     merger.close()
 
-    s3_pdf_url = upload_file(file_path=event.path_pdf_invoice, file_name=event.filename)
+    s3_pdf_url = upload_file(
+        file_path=event.path_pdf_invoice, file_name=event.filename, is_pdf=True
+    )
     conn = next(get_db())
     crud.patch_file(
         db=conn,

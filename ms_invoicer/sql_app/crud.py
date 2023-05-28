@@ -43,11 +43,11 @@ def create_topinfo(db: Session, model: schemas.TopInfoCreate):
 
 
 # Globals ----------------------------------------------------------
-def get_global(db: Session, global_name: str, current_user_id: int):
+def get_global(db: Session, identifier: int, current_user_id: int):
     return (
         db.query(models.Globals)
         .filter(
-            models.Globals.name == global_name,
+            models.Globals.identifier == identifier,
             models.Globals.user_id == current_user_id,
         )
         .first()

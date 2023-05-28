@@ -4,6 +4,7 @@ from typing import List, Union
 from pydantic import BaseModel
 
 
+# USER -------------------------------------------------------------
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -11,6 +12,7 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Union[str, None] = None
+
 
 class UserBase(BaseModel):
     username: str
@@ -21,6 +23,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     pass
+
 
 class UserAuthenticate(BaseModel):
     username: str
@@ -40,6 +43,7 @@ class User(BaseModel):
         orm_mode = True
 
 
+# Global -------------------------------------------------------------
 class GlobalBase(BaseModel):
     identifier: int
     name: str
@@ -59,6 +63,7 @@ class Global(GlobalBase):
         orm_mode = True
 
 
+# SERVICE -------------------------------------------------------------
 class ServiceBase(BaseModel):
     title: str
     amount: int
@@ -80,6 +85,7 @@ class Service(ServiceBase):
         orm_mode = True
 
 
+# BILLTO -------------------------------------------------------------
 class BillToBase(BaseModel):
     to: str
     addr: str
@@ -98,6 +104,7 @@ class BillTo(BillToBase):
         orm_mode = True
 
 
+# TOPINFO -------------------------------------------------------------
 class TopInfoBase(BaseModel):
     ti_from: str
     email: str
@@ -116,6 +123,7 @@ class TopInfo(TopInfoBase):
         orm_mode = True
 
 
+# FILE -------------------------------------------------------------
 class FileBase(BaseModel):
     s3_xlsx_url: str
     s3_pdf_url: Union[str, None]
@@ -128,6 +136,7 @@ class FileCreate(FileBase):
     user_id: int
 
 
+# CUSTOMER -------------------------------------------------------------
 class CustomerBase(BaseModel):
     name: str
 
@@ -144,6 +153,7 @@ class CustomerLite(CustomerBase):
         orm_mode = True
 
 
+# INVOICE -------------------------------------------------------------
 class InvoiceBase(BaseModel):
     number_id: int
     reason: str
@@ -165,6 +175,7 @@ class InvoiceLite(InvoiceBase):
         orm_mode = True
 
 
+# FILE -------------------------------------------------------------
 class File(FileBase):
     id: int
     bill_to: BillTo
@@ -174,6 +185,7 @@ class File(FileBase):
         orm_mode = True
 
 
+# INVOICE -------------------------------------------------------------
 class Invoice(InvoiceBase):
     id: int
     files: List[File] = []
@@ -182,6 +194,7 @@ class Invoice(InvoiceBase):
         orm_mode = True
 
 
+# CUSTOMER -------------------------------------------------------------
 class Customer(CustomerBase):
     id: int
     num_invoices: int
