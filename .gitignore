@@ -67,3 +67,4 @@ venv/
 temp/
 *.pem
 no_upload_helper.py
+no_upload_helper_copy.py

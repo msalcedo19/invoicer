@@ -5,6 +5,25 @@ from sqlalchemy.orm import Session
 from ms_invoicer.sql_app import models, schemas
 
 
+# Template ----------------------------------------------------------
+def get_template(db: Session, current_user_id: int):
+    return (
+        db.query(models.Template)
+        .filter(
+            models.Template.user_id == current_user_id,
+        )
+        .first()
+    )
+
+
+def create_template(db: Session, model: schemas.TemplateCreate):
+    db_model = models.Template(**model.dict())
+    db.add(db_model)
+    db.commit()
+    db.refresh(db_model)
+    return db_model
+
+
 # TopInfo ----------------------------------------------------------
 def get_topinfos(db: Session, current_user_id: int):
     return (
@@ -487,3 +506,15 @@ def create_user(db: Session, model: schemas.UserCreate):
 
 def get_user_by_username(db: Session, username: str):
     return db.query(models.User).filter(models.User.username == username).first()
+
+
+def delete_user(db: Session, model_id: int):
+    result = (
+        db.query(models.User)
+        .filter(
+            models.User.id == model_id,
+        )
+        .delete()
+    )
+    db.delete(result)
+    db.commit()

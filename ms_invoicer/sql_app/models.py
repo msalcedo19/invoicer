@@ -1,3 +1,4 @@
+from html.entities import name2codepoint
 from sqlalchemy import Column, DateTime, Double, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -104,5 +105,15 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String)
     hashpass = Column(String)
+    created = Column(DateTime)
+    updated = Column(DateTime)
+
+
+class Template(Base):
+    __tablename__ = "template"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    user_id = Column(Integer, ForeignKey("invoicer_user.id"), nullable=True)
     created = Column(DateTime)
     updated = Column(DateTime)

@@ -10,8 +10,16 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from alembic import op
-from ms_invoicer.sql_app.models import (BillTo, Customer, File, Globals,
-                                        Invoice, Service, TopInfo, User)
+from ms_invoicer.sql_app.models import (
+    BillTo,
+    Customer,
+    File,
+    Globals,
+    Invoice,
+    Service,
+    TopInfo,
+    User,
+)
 
 # revision identifiers, used by Alembic.
 revision = "a4165cb2a1eb"

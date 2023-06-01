@@ -43,6 +43,24 @@ class User(BaseModel):
         orm_mode = True
 
 
+# Template -------------------------------------------------------------
+class TemplateBase(BaseModel):
+    name: str
+    created: datetime
+    updated: datetime
+
+
+class TemplateCreate(TemplateBase):
+    user_id: int
+
+
+class Template(TemplateBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 # Global -------------------------------------------------------------
 class GlobalBase(BaseModel):
     identifier: int

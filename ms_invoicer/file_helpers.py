@@ -196,11 +196,18 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             model_id=event.data.file_id,
             current_user_id=event.data.current_user_id,
         )
+        template: schemas.Template = crud.get_template(
+            db=conn, current_user_id=event.data.current_user_id
+        )
+        template_name = "template01.html"
+        if template:
+            template_name = template.name
+
         data_event = PdfToProcessEvent(
             current_user_id=event.data.current_user_id,
             invoice=invoice_obj,
             file=file_obj,
-            html_template_name="template01.html",
+            html_template_name=template_name,
             xlsx_url=event.data.xlsx_url,
         )
         await publish(data_event)
