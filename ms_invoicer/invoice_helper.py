@@ -101,11 +101,25 @@ async def build_pdf(event: PdfToProcessEvent):
         if empresa_variable:
             title_company = empresa_variable.value
 
+        variables = crud.get_globals(
+            db=connection, current_user_id=event.current_user_id
+        )
+        tps_name = "TPS -"
+        tvq_name = "TVQ -"
+        for variable in variables:
+            if variable.identifier == 1:
+                tps_name = variable.name
+            elif variable.identifier == 2:
+                tvq_name = variable.name
+
         context = {
             "title_company": title_company,
             "invoice_date": event.invoice.created.strftime("%d-%m-%Y"),
             "invoice_id": event.invoice.number_id,
             "created": event.invoice.created,
+            "tps_name": tps_name,
+            "tvq_name": tvq_name,
+            "total": round(total, 2),
             "total_no_taxes": round(subtotal, 2),
             "total_tax1": round(total_tax_1, 2),
             "total_tax2": round(total_tax_2, 2),
