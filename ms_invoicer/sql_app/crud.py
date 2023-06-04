@@ -31,16 +31,6 @@ def get_topinfos(db: Session, current_user_id: int):
     )
 
 
-def get_topinfo_by_id(db: Session, model_id: str, current_user_id: int):
-    return (
-        db.query(models.TopInfo)
-        .filter(
-            models.TopInfo.id == model_id, models.TopInfo.user_id == current_user_id
-        )
-        .first()
-    )
-
-
 def patch_topinfo(db: Session, model_id: int, current_user_id: int, update_dict: dict):
     result = (
         db.query(models.TopInfo)
@@ -103,73 +93,6 @@ def patch_global(db: Session, model_id: int, current_user_id: int, update_dict: 
 
 def create_global(db: Session, model: schemas.GlobalCreate):
     db_model = models.Globals(**model.dict())
-    db.add(db_model)
-    db.commit()
-    db.refresh(db_model)
-    return db_model
-
-
-# Contract ----------------------------------------------------------
-def get_contract(db: Session, model_id: int, current_user_id: int):
-    return (
-        db.query(models.Service)
-        .filter(
-            models.Service.id == model_id, models.Service.user_id == current_user_id
-        )
-        .first()
-    )
-
-
-def get_contracts(
-    db: Session, current_user_id: int, skip: int = 0, limit: int = 100
-) -> List[models.Customer]:
-    return (
-        db.query(models.Service)
-        .filter(models.Service.user_id == current_user_id)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-
-def get_contracts_by_customer(db: Session, model_id: int, current_user_id: int):
-    return (
-        db.query(models.Service)
-        .filter(
-            models.Service.invoice_id == models.Invoice.id,
-            models.Invoice.customer_id == model_id,
-            models.Service.user_id == current_user_id,
-        )
-        .all()
-    )
-
-
-def delete_contract(db: Session, model_id: int, current_user_id: int):
-    result = (
-        db.query(models.Service)
-        .filter(
-            models.Service.id == model_id, models.Service.user_id == current_user_id
-        )
-        .delete()
-    )
-    db.commit()
-    return result
-
-
-def patch_contract(db: Session, model_id: int, current_user_id: int, update_dict: dict):
-    result = (
-        db.query(models.Service)
-        .filter(
-            models.Service.id == model_id, models.Service.user_id == current_user_id
-        )
-        .update(update_dict)
-    )
-    db.commit()
-    return result
-
-
-def create_contract(db: Session, model: schemas.ServiceCreate):
-    db_model = models.Service(**model.dict())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)

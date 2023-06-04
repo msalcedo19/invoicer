@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ms_invoicer.config import LOG_LEVEL
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.event_handler import register_event_handlers
-from ms_invoicer.routers import bill_to, contract, customer, files, invoice, user
+from ms_invoicer.routers import bill_to, customer, files, invoice, user
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import create_folders
@@ -27,7 +27,6 @@ api.add_middleware(
     allow_headers=["*"],
 )
 api.include_router(customer.router, tags=["Customer"])
-api.include_router(contract.router, tags=["Contract"])
 api.include_router(invoice.router, tags=["Invoice"])
 api.include_router(files.router, tags=["File"])
 api.include_router(bill_to.router, tags=["Bill_to"])
