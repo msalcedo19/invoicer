@@ -1,4 +1,3 @@
-from html.entities import name2codepoint
 from sqlalchemy import Column, DateTime, Double, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 

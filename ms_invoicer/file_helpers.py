@@ -1,84 +1,20 @@
 import logging
-from math import ceil
-import os
+import openpyxl
+
 from datetime import datetime
 from pathlib import Path
-from typing import List
 from uuid import uuid4
 
-import boto3
-import openpyxl
-from botocore.exceptions import ClientError
 from fastapi import UploadFile
 from openpyxl.cell.cell import Cell
-from openpyxl.worksheet.worksheet import Worksheet
 
-from ms_invoicer.config import S3_ACCESS_KEY, S3_SECRET_ACCESS_KEY
 from ms_invoicer.dao import FilesToProcessData, FilesToProcessEvent, PdfToProcessEvent
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.event_bus import publish
 from ms_invoicer.sql_app import crud, schemas
+from ms_invoicer.utils import save_file, find_ranges, upload_file
 
 log = logging.getLogger(__name__)
-
-
-def save_file(file_path: str, file: UploadFile):
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    with open(file_path, "wb") as output_file:
-        output_file.write(file.file.read())
-
-
-def find_ranges(sheet: Worksheet) -> List[tuple]:
-    """
-    This function takes an Excel worksheet (using the openpyxl library) as input,
-    searches for a specific string in the first column of the sheet, and returns
-    a list of tuples representing the row ranges that contain the string.
-
-    Input:
-
-    sheet: an Excel worksheet object (type: Worksheet)
-
-    Output:
-
-    A list of tuples, where each tuple contains four integers representing the
-    starting and ending rows of a range that contains the target string.
-
-    Functionality:
-
-    The function iterates through each row of the given worksheet, stopping at
-    row 200 and column 10. For each row, it checks the value of the first cell
-    (column A). If the value is a non-empty string containing the text "NOM CONTRAT",
-    the function records the starting row number and adds a tuple to the result list.
-    The tuple contains the starting row number, the row number 2 rows below the
-    starting row, the row number 4 rows below the starting row, and the row number
-    34 rows below the starting row. These row numbers are calculated based on the
-    assumption that each contract occupies 31 rows (31 days in a month).
-    """
-    result = []
-    start_num = None
-    end_num = None
-    for row in sheet.iter_rows(max_col=10, max_row=200):
-        row_data: Cell = row[0]
-        if (
-            row_data.value
-            and isinstance(row_data.value, str)
-            and row_data.value.startswith("NOM CONTRAT")
-        ):
-            start_num = int(row_data.row)
-            # result.append((start_num, start_num + 2, start_num + 4, start_num + 34))
-        elif (
-            row_data.value
-            and isinstance(row_data.value, str)
-            and row_data.value.startswith("TOTAL")
-        ):
-            end_num = int(row_data.row)
-
-        if start_num and end_num:
-            result.append((start_num, start_num + 2, start_num + 4, end_num))
-            start_num = None
-            end_num = None
-    return result
 
 
 async def process_file(
@@ -89,13 +25,16 @@ async def process_file(
     col_letter: str = "F",
 ) -> schemas.File:
     try:
+        log.info("Customer {} - Processing file".format(current_user_id))
         date_now = datetime.now()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
         file_path = "temp/xlsx/{}".format(filename)
         save_file(file_path, file)
+        log.info("Customer {} - File saved".format(current_user_id))
 
         price_unit = 1
         currency = "CAD"
+        log.info("Customer {} - Uploading file".format(current_user_id))
         s3_url = upload_file(file_path=file_path, file_name=filename)
         file_obj = schemas.FileCreate(
             **{
@@ -117,15 +56,17 @@ async def process_file(
             col_letter=col_letter,
             currency=currency,
         )
+        log.info("Customer {} - Publishing process event".format(current_user_id))
         await publish(FilesToProcessEvent(data=data_event))
         return new_file
     except Exception as e:
-        log.error("File processing failed")
         log.error(e)
+        log.error("Customer {} - Failure processing file".format(current_user_id))
         raise
 
 
 async def extract_data(event: FilesToProcessEvent) -> bool:
+    log.info("Customer {} - Extracting data".format(event.data.current_user_id))
     event_handled = False
     conn = next(get_db())
     try:
@@ -210,57 +151,11 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             html_template_name=template_name,
             xlsx_url=event.data.xlsx_url,
         )
+        log.info("Customer {} - Publishing pdf event".format(event.data.current_user_id))
         await publish(data_event)
         event_handled = True
         return event_handled
     except Exception as e:
-        log.error("Extracting data failed")
+        log.error("Customer {} - Failure extracting data".format(event.data.current_user_id))
         log.error(e)
         raise
-
-
-def upload_file(
-    file_path: str,
-    file_name: str,
-    bucket="invoicer-files-dev",
-    object_name=None,
-    is_pdf=False,
-):
-    """Upload a file to an S3 bucket
-
-    :param file_name: File to upload
-    :param bucket: Bucket to upload to
-    :param object_name: S3 object name. If not specified then file_name is used
-    :return: True if file was uploaded, else False
-    """
-
-    # If S3 object_name was not specified, use file_name
-    if object_name is None:
-        object_name = os.path.basename(file_path)
-
-    # Upload the file
-    session: boto3.Session = boto3.session.Session()
-    s3 = session.client(
-        "s3",
-        aws_access_key_id=S3_ACCESS_KEY,
-        aws_secret_access_key=S3_SECRET_ACCESS_KEY,
-    )
-    try:
-        args = {"ACL": "public-read"}
-        if is_pdf:
-            args = {
-                "ACL": "public-read",
-                "ContentType": "application/pdf",
-                "ContentDisposition": "inline",
-            }
-        s3.upload_file(
-            file_path,
-            bucket,
-            object_name,
-            ExtraArgs=args,
-        )
-        url = "https://" + bucket + ".s3.amazonaws.com/" + file_name
-        return url
-    except ClientError as e:
-        logging.error(e)
-    return None
