@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 from openpyxl.cell.cell import Cell
+from ms_invoicer.config import S3_BUCKET_NAME
 
 from ms_invoicer.dao import FilesToProcessData, FilesToProcessEvent, PdfToProcessEvent
 from ms_invoicer.db_pool import get_db
@@ -23,11 +24,13 @@ async def process_file(
     bill_to_id: int,
     current_user_id: int,
     col_letter: str = "F",
+    with_taxes: bool = True
 ) -> schemas.File:
     try:
-        log.info("Customer {} - Processing file".format(current_user_id))
+        log.info("Customer {} - Processing file".format(current_user_id)) #TODO: Mejorar mensaje en los logs (Hay mensajes que se repiten y no se puede saber donde fallo)
         date_now = datetime.now()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
+        filename = filename.replace(" ", "_")
         file_path = "temp/xlsx/{}".format(filename)
         save_file(file_path, file)
         log.info("Customer {} - File saved".format(current_user_id))
@@ -35,7 +38,7 @@ async def process_file(
         price_unit = 1
         currency = "CAD"
         log.info("Customer {} - Uploading file".format(current_user_id))
-        s3_url = upload_file(file_path=file_path, file_name=filename)
+        s3_url = upload_file(file_path=file_path, file_name=filename, bucket=S3_BUCKET_NAME)
         file_obj = schemas.FileCreate(
             **{
                 "s3_xlsx_url": s3_url,
@@ -55,6 +58,7 @@ async def process_file(
             price_unit=price_unit,
             col_letter=col_letter,
             currency=currency,
+            with_taxes=with_taxes
         )
         log.info("Customer {} - Publishing process event".format(current_user_id))
         await publish(FilesToProcessEvent(data=data_event))
@@ -141,7 +145,9 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             db=conn, current_user_id=event.data.current_user_id
         )
         template_name = "template01.html"
-        if template:
+        if not event.data.with_taxes:
+            template_name = "template03.html"
+        elif template:
             template_name = template.name
 
         data_event = PdfToProcessEvent(
@@ -150,6 +156,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             file=file_obj,
             html_template_name=template_name,
             xlsx_url=event.data.xlsx_url,
+            with_taxes=event.data.with_taxes
         )
         log.info("Customer {} - Publishing pdf event".format(event.data.current_user_id))
         await publish(data_event)

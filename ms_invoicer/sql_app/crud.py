@@ -6,6 +6,12 @@ from ms_invoicer.sql_app import models, schemas
 
 
 # Template ----------------------------------------------------------
+def get_templates(db: Session, current_user_id: int):
+    return (
+        db.query(models.Template).filter(models.Template.user_id == current_user_id).all()
+    )
+
+
 def get_template(db: Session, current_user_id: int):
     return (
         db.query(models.Template)

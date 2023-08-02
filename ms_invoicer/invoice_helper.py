@@ -13,8 +13,8 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import PageBreak, SimpleDocTemplate, Table, TableStyle
 
-from ms_invoicer.config import WKHTMLTOPDF_PATH
-from ms_invoicer.dao import GenerateFinalPDF, PdfToProcessEvent
+from ms_invoicer.config import S3_BUCKET_NAME, WKHTMLTOPDF_PATH
+from ms_invoicer.dao import GenerateFinalPDF, GenerateFinalPDFNoFile, PdfToProcessEvent
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.event_bus import publish
 from ms_invoicer.utils import find_ranges, upload_file
@@ -96,7 +96,7 @@ async def build_pdf(event: PdfToProcessEvent):
 
             total_tax_1 = (event.invoice.tax_1 / 100) * subtotal
             total_tax_2 = (event.invoice.tax_2 / 100) * subtotal
-            total = total_tax_1 + total_tax_2 + subtotal
+            total = total_tax_1 + total_tax_2 + subtotal #TODO: El total cambia si no se usa los taxes en la factura?
 
             title_company = "-"
             empresa_variable = crud.get_global(
@@ -121,14 +121,16 @@ async def build_pdf(event: PdfToProcessEvent):
                 "invoice_date": event.invoice.created.strftime("%d-%m-%Y"),
                 "invoice_id": event.invoice.number_id,
                 "created": event.invoice.created,
-                "tps_name": tps_name,
-                "tvq_name": tvq_name,
                 "total": round(total, 2),
                 "total_no_taxes": round(subtotal, 2),
-                "total_tax1": round(total_tax_1, 2),
-                "total_tax2": round(total_tax_2, 2),
                 "total": round(total, 2),
             }
+            if event.with_taxes:
+                context["tps_name"] = tps_name
+                context["tvq_name"] = tvq_name
+                context["total_tax1"] = round(total_tax_1, 2)
+                context["total_tax2"] = round(total_tax_2, 2)
+            
             context |= bill_to_data
             context |= service_data
             context |= top_info_data
@@ -141,20 +143,29 @@ async def build_pdf(event: PdfToProcessEvent):
             output_text = template.render(context)
 
             filename = f"facture_{event.invoice.number_id}_{service_info.title}_{event.invoice.created.strftime('%m_%Y')}-{str(uuid4())}.pdf"
+            filename = filename.replace(" ", "_")
             output_pdf_path: str = "temp/pdf/{}".format(filename)
             config = pdfkit.configuration(
                 wkhtmltopdf=WKHTMLTOPDF_PATH
             )  # TODO: Modificar en la máquina
             pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
-            data_event = GenerateFinalPDF(
-                current_user_id=event.current_user_id,
-                pdf_tables=f"temp/pdf_tables_{event.current_user_id}.pdf",
-                xlsx_url=event.xlsx_url,
-                pdf_invoice=output_pdf_path,
-                filename=filename,
-                file_id=event.file.id,
-            )
+            if event.with_file:
+                data_event = GenerateFinalPDF(
+                    current_user_id=event.current_user_id,
+                    pdf_tables=f"temp/pdf_tables_{event.current_user_id}.pdf",
+                    xlsx_url=event.xlsx_url,
+                    pdf_invoice=output_pdf_path,
+                    filename=filename,
+                    file_id=event.file.id,
+                )
+            else:
+                data_event = GenerateFinalPDFNoFile(
+                    current_user_id=event.current_user_id,
+                    pdf_invoice=output_pdf_path,
+                    filename=filename,
+                    file_id=event.file.id,
+                )
             log.info("Customer {} - Publishing final pdf event".format(event.current_user_id))
             await publish(data_event)
             return True
@@ -239,7 +250,29 @@ def generate_invoice(event: GenerateFinalPDF):
 
         log.info("Customer {} - Uploading invoice".format(event.current_user_id))
         s3_pdf_url = upload_file(
-            file_path=event.path_pdf_invoice, file_name=event.filename, is_pdf=True
+            file_path=event.path_pdf_invoice, file_name=event.filename, is_pdf=True, bucket=S3_BUCKET_NAME
+        )
+        conn = next(get_db())
+        crud.patch_file(
+            db=conn,
+            model_id=event.file_id,
+            update_dict={"s3_pdf_url": s3_pdf_url},
+            current_user_id=event.current_user_id,
+        )
+        log.info("Customer {} - Invoice generated".format(event.current_user_id))
+        return True
+    except Exception as e:
+        log.error(e)
+        log.error("Customer {} - Failure generating invoice".format(event.current_user_id))
+        raise
+
+
+def generate_invoice_no_file(event: GenerateFinalPDFNoFile):
+    log.info("Customer {} - Building invoice".format(event.current_user_id))
+    try:
+        log.info("Customer {} - Uploading invoice".format(event.current_user_id))
+        s3_pdf_url = upload_file(
+            file_path=event.path_pdf_invoice, file_name=event.filename, is_pdf=True, bucket=S3_BUCKET_NAME
         )
         conn = next(get_db())
         crud.patch_file(

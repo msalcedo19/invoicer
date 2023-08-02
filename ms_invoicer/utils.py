@@ -1,3 +1,4 @@
+from typing import Union
 import logging
 import os
 import boto3
@@ -105,7 +106,7 @@ def find_ranges(sheet: Worksheet) -> List[tuple]:
 def upload_file(
     file_path: str,
     file_name: str,
-    bucket="invoicer-files-dev",
+    bucket="invoicer-dev-01",
     object_name=None,
     is_pdf=False,
 ):
@@ -131,10 +132,16 @@ def upload_file(
     try:
         args = {"ACL": "public-read"}
         if is_pdf:
+            try:
+                download_filename = file_name.split("-")[0]
+            except:
+                download_filename = file_name
             args = {
                 "ACL": "public-read",
                 "ContentType": "application/pdf",
-                "ContentDisposition": "inline",
+                "ContentDisposition": 'inline; filename="{}.pdf"'.format(
+                    download_filename
+                ),
             }
         s3.upload_file(
             file_path,
@@ -147,3 +154,21 @@ def upload_file(
     except Exception as e:
         log.error(e)
         raise Exception("Failure uploading file")
+
+
+def delete_file_from_s3(file_names: Union[str, list], bucket_name="invoicer-dev-01"):
+    try:
+        # Create a session using your AWS credentials
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=S3_ACCESS_KEY,
+            aws_secret_access_key=S3_SECRET_ACCESS_KEY,
+        )
+        if isinstance(file_names, list):
+            for file_name in file_names:
+                s3_client.delete_object(Bucket=bucket_name, Key=file_name)
+        else:
+            s3_client.delete_object(Bucket=bucket_name, Key=file_names)
+    except Exception as e:
+        log.error(e)
+        raise Exception("Failure deleting file")

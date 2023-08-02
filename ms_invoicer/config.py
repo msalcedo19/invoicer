@@ -10,6 +10,7 @@ URL_CONNECTION = os.environ.get(
 # S3
 S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "")
 S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", "")
+S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "invoicer-dev-01")
 
 # PDF
 WKHTMLTOPDF_PATH = os.environ.get("WKHTMLTOPDF_PATH", "/usr/local/bin/wkhtmltopdf")
