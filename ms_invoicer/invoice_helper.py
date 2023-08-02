@@ -96,7 +96,13 @@ async def build_pdf(event: PdfToProcessEvent):
 
             total_tax_1 = (event.invoice.tax_1 / 100) * subtotal
             total_tax_2 = (event.invoice.tax_2 / 100) * subtotal
+<<<<<<< Updated upstream
             total = total_tax_1 + total_tax_2 + subtotal
+=======
+            total = subtotal
+            if event.with_taxes:
+                total = total_tax_1 + total_tax_2 + subtotal
+>>>>>>> Stashed changes
 
             title_company = "-"
             empresa_variable = crud.get_global(
@@ -124,11 +130,22 @@ async def build_pdf(event: PdfToProcessEvent):
                 "tps_name": tps_name,
                 "tvq_name": tvq_name,
                 "total": round(total, 2),
+<<<<<<< Updated upstream
                 "total_no_taxes": round(subtotal, 2),
                 "total_tax1": round(total_tax_1, 2),
                 "total_tax2": round(total_tax_2, 2),
                 "total": round(total, 2),
             }
+=======
+            }
+            if event.with_taxes:
+                context["tps_name"] = tps_name
+                context["tvq_name"] = tvq_name
+                context["total_no_taxes"] = round(subtotal, 2)
+                context["total_tax1"] = round(total_tax_1, 2)
+                context["total_tax2"] = round(total_tax_2, 2)
+            
+>>>>>>> Stashed changes
             context |= bill_to_data
             context |= service_data
             context |= top_info_data
