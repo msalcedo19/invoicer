@@ -95,6 +95,12 @@ class ServiceBase(BaseModel):
 class ServiceCreate(ServiceBase):
     user_id: int
 
+class ServiceCreateNoFile(BaseModel):
+    title: str
+    amount: int
+    currency: str
+    hours: float
+    price_unit: float
 
 class Service(ServiceBase):
     id: int
@@ -143,7 +149,7 @@ class TopInfo(TopInfoBase):
 
 # FILE -------------------------------------------------------------
 class FileBase(BaseModel):
-    s3_xlsx_url: str
+    s3_xlsx_url: Union[str, None]
     s3_pdf_url: Union[str, None]
     created: datetime
     invoice_id: int

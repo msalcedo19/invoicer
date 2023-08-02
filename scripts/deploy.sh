@@ -33,5 +33,6 @@ fi
 # Restart the necessary services or processes
 echo "Restarting services..."
 sudo systemctl restart invoicer
+sudo systemctl status invoicer
 
 echo "Script execution completed successfully."

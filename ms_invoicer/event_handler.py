@@ -1,7 +1,7 @@
-from ms_invoicer.dao import FilesToProcessEvent, GenerateFinalPDF, PdfToProcessEvent
+from ms_invoicer.dao import FilesToProcessEvent, GenerateFinalPDF, GenerateFinalPDFNoFile, PdfToProcessEvent
 from ms_invoicer.event_bus import register
 from ms_invoicer.file_helpers import extract_data
-from ms_invoicer.invoice_helper import build_pdf, generate_invoice
+from ms_invoicer.invoice_helper import build_pdf, generate_invoice, generate_invoice_no_file
 
 
 def register_event_handlers():
@@ -11,3 +11,4 @@ def register_event_handlers():
     register(FilesToProcessEvent, extract_data)
     register(PdfToProcessEvent, build_pdf)
     register(GenerateFinalPDF, generate_invoice)
+    register(GenerateFinalPDFNoFile, generate_invoice_no_file)

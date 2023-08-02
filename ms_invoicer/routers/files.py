@@ -29,13 +29,18 @@ def get_files(
 
 
 @router.patch("/files/{model_id}", response_model=Union[schemas.File, None])
-def patch_customer(
+def patch_file(
     model_update: dict,
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    result = crud.patch_file(db=db, model_id=model_id, update_dict=model_update)
+    result = crud.patch_file(
+        db=db,
+        model_id=model_id,
+        update_dict=model_update,
+        current_user_id=current_user.id,
+    )
     if result:
         return crud.get_file(db=db, model_id=model_id, current_user_id=current_user.id)
     else:
@@ -60,6 +65,7 @@ async def create_upload_file(
     invoice_id: str = Form(),
     bill_to_id: str = Form(),
     file: UploadFile = Form(),
+    with_taxes: bool = Form(),
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -68,7 +74,21 @@ async def create_upload_file(
         invoice_id=int(invoice_id),
         bill_to_id=int(bill_to_id),
         current_user_id=current_user.id,
+        with_taxes=with_taxes
     )
     return crud.get_file(
         db=db, model_id=file_created.id, current_user_id=current_user.id
+    )
+
+
+@router.post("/file", response_model=schemas.File)
+async def create_file(
+    file: schemas.FileCreate,
+    current_user: schemas.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    obj_dict = file.dict()
+    obj_dict["user_id"] = current_user.id
+    return crud.create_file(
+        db=db, model=schemas.FileCreate(**obj_dict), current_user_id=current_user.id
     )

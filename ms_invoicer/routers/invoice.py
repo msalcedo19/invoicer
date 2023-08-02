@@ -2,10 +2,12 @@ from typing import List, Union
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
+from ms_invoicer.config import S3_BUCKET_NAME
 
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
+from ms_invoicer.utils import delete_file_from_s3
 
 router = APIRouter()
 
@@ -86,13 +88,21 @@ def delete_invoice(
     files = crud.get_files_by_invoice(
         db=db, model_id=model_id, current_user_id=current_user.id
     )
+    files_to_delete = []
     for file in files:
         crud.delete_services_by_file(
             db=db, model_id=file.id, current_user_id=current_user.id
         )
+        if file.s3_pdf_url:
+            file_name = file.s3_pdf_url.split("/")[3]
+            files_to_delete.append(file_name)
+        if file.s3_xlsx_url:
+            file_name = file.s3_pdf_url.split("/")[3]
+            files_to_delete.append(file_name)
     crud.delete_files_by_invoice(
         db=db, model_id=model_id, current_user_id=current_user.id
     )
+    delete_file_from_s3(file_names=files_to_delete, bucket_name=S3_BUCKET_NAME)
     return crud.delete_invoice(
         db=db, model_id=model_id, current_user_id=current_user.id
     )
