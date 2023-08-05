@@ -14,7 +14,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import PageBreak, SimpleDocTemplate, Table, TableStyle
 
 from ms_invoicer.config import S3_BUCKET_NAME, WKHTMLTOPDF_PATH
-from ms_invoicer.dao import GenerateFinalPDF, GenerateFinalPDFNoFile, PdfToProcessEvent
+from ms_invoicer.dao import GenerateFinalPDFNoFile, GenerateFinalPDFWithFile, PdfToProcessEvent
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.event_bus import publish
 from ms_invoicer.utils import find_ranges, upload_file
@@ -26,11 +26,7 @@ log = logging.getLogger(__name__)
 
 async def build_pdf(event: PdfToProcessEvent):
     try:
-        assert event.html_template_name.endswith(".html")
-        assert event.file.bill_to is not None
-        assert len(event.file.services) != 0
-
-        log.info("Customer {} - Building pdf".format(event.current_user_id))
+        log.info("Customer {} - Initiated building pdf - fun: build_pdf".format(event.current_user_id))
         connection = next(get_db())
         input_html_path: str = os.path.join(
             base, "templates/base/{}".format(event.html_template_name)
@@ -61,7 +57,7 @@ async def build_pdf(event: PdfToProcessEvent):
             with open(output_html_path, "w") as file:
                 file.write(str(soup))
 
-            log.info("Customer {} - Adding pdf data".format(event.current_user_id))
+            log.info("Customer {} - Adding pdf data - fun: build_pdf".format(event.current_user_id))
             top_info_data = {}
             top_info = crud.get_topinfos(
                 db=connection, current_user_id=event.current_user_id
@@ -96,17 +92,9 @@ async def build_pdf(event: PdfToProcessEvent):
 
             total_tax_1 = (event.invoice.tax_1 / 100) * subtotal
             total_tax_2 = (event.invoice.tax_2 / 100) * subtotal
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-            total = total_tax_1 + total_tax_2 + subtotal
-=======
             total = subtotal
             if event.with_taxes:
                 total = total_tax_1 + total_tax_2 + subtotal
->>>>>>> Stashed changes
-=======
-            total = total_tax_1 + total_tax_2 + subtotal #TODO: El total cambia si no se usa los taxes en la factura?
->>>>>>> 1b434ceb87e2c7cc6ac9b767b6e9485290610903
 
             title_company = "-"
             empresa_variable = crud.get_global(
@@ -132,34 +120,20 @@ async def build_pdf(event: PdfToProcessEvent):
                 "invoice_id": event.invoice.number_id,
                 "created": event.invoice.created,
                 "total": round(total, 2),
-<<<<<<< Updated upstream
-                "total_no_taxes": round(subtotal, 2),
-                "total": round(total, 2),
             }
-<<<<<<< HEAD
-=======
-            }
+
             if event.with_taxes:
                 context["tps_name"] = tps_name
                 context["tvq_name"] = tvq_name
                 context["total_no_taxes"] = round(subtotal, 2)
                 context["total_tax1"] = round(total_tax_1, 2)
                 context["total_tax2"] = round(total_tax_2, 2)
-            
->>>>>>> Stashed changes
-=======
-            if event.with_taxes:
-                context["tps_name"] = tps_name
-                context["tvq_name"] = tvq_name
-                context["total_tax1"] = round(total_tax_1, 2)
-                context["total_tax2"] = round(total_tax_2, 2)
-            
->>>>>>> 1b434ceb87e2c7cc6ac9b767b6e9485290610903
+
             context |= bill_to_data
             context |= service_data
             context |= top_info_data
 
-            log.info("Customer {} - Building pdf".format(event.current_user_id))
+            log.info("Customer {} - Creating pdf - fun: build_pdf".format(event.current_user_id))
             template_loader = jinja2.FileSystemLoader(os.path.join(base, "templates"))
             template_env = jinja2.Environment(loader=template_loader)
 
@@ -175,7 +149,7 @@ async def build_pdf(event: PdfToProcessEvent):
             pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
             if event.with_file:
-                data_event = GenerateFinalPDF(
+                data_event = GenerateFinalPDFWithFile(
                     current_user_id=event.current_user_id,
                     pdf_tables=f"temp/pdf_tables_{event.current_user_id}.pdf",
                     xlsx_url=event.xlsx_url,
@@ -190,17 +164,16 @@ async def build_pdf(event: PdfToProcessEvent):
                     filename=filename,
                     file_id=event.file.id,
                 )
-            log.info("Customer {} - Publishing final pdf event".format(event.current_user_id))
+            log.info("Customer {} - Publishing GenerateFinalPDF event - fun: build_pdf".format(event.current_user_id))
             await publish(data_event)
             return True
     except Exception as e:
-        log.error(e)
-        log.error("Customer {} - Failure building pdf".format(event.current_user_id))
+        log.error("Customer {} - Failure building pdf - err: {}".format(event.current_user_id, e))
         raise
 
 
-def generate_invoice(event: GenerateFinalPDF):
-    log.info("Customer {} - Building invoice".format(event.current_user_id))
+def generate_invoice(event: GenerateFinalPDFWithFile):
+    log.info("Customer {} - Building invoice - fun: generate_invoice".format(event.current_user_id))
     try:
         # Define the page size
         page_size = letter
@@ -272,7 +245,7 @@ def generate_invoice(event: GenerateFinalPDF):
         merger.write(event.path_pdf_invoice)
         merger.close()
 
-        log.info("Customer {} - Uploading invoice".format(event.current_user_id))
+        log.info("Customer {} - Uploading invoice - fun: generate_invoice".format(event.current_user_id))
         s3_pdf_url = upload_file(
             file_path=event.path_pdf_invoice, file_name=event.filename, is_pdf=True, bucket=S3_BUCKET_NAME
         )
@@ -283,18 +256,17 @@ def generate_invoice(event: GenerateFinalPDF):
             update_dict={"s3_pdf_url": s3_pdf_url},
             current_user_id=event.current_user_id,
         )
-        log.info("Customer {} - Invoice generated".format(event.current_user_id))
+        log.info("Customer {} - Invoice generated - fun: generate_invoice".format(event.current_user_id))
         return True
     except Exception as e:
-        log.error(e)
-        log.error("Customer {} - Failure generating invoice".format(event.current_user_id))
+        log.error("Customer {} - Failure generating invoice - err: {}".format(event.current_user_id, e))
         raise
 
 
 def generate_invoice_no_file(event: GenerateFinalPDFNoFile):
-    log.info("Customer {} - Building invoice".format(event.current_user_id))
+    log.info("Customer {} - Building invoice - fun: generate_invoice_no_file".format(event.current_user_id))
     try:
-        log.info("Customer {} - Uploading invoice".format(event.current_user_id))
+        log.info("Customer {} - Uploading invoice - fun: generate_invoice_no_file".format(event.current_user_id))
         s3_pdf_url = upload_file(
             file_path=event.path_pdf_invoice, file_name=event.filename, is_pdf=True, bucket=S3_BUCKET_NAME
         )
@@ -305,9 +277,8 @@ def generate_invoice_no_file(event: GenerateFinalPDFNoFile):
             update_dict={"s3_pdf_url": s3_pdf_url},
             current_user_id=event.current_user_id,
         )
-        log.info("Customer {} - Invoice generated".format(event.current_user_id))
+        log.info("Customer {} - Invoice generated - fun: generate_invoice_no_file".format(event.current_user_id))
         return True
     except Exception as e:
-        log.error(e)
-        log.error("Customer {} - Failure generating invoice".format(event.current_user_id))
+        log.error("Customer {} - Failure generating invoice - err: {}".format(event.current_user_id, e))
         raise

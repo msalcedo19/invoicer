@@ -246,6 +246,15 @@ def get_billtos(db: Session, current_user_id: int, skip: int = 0, limit: int = 1
     )
 
 
+def get_billtos_no_user(db: Session, skip: int = 0, limit: int = 100):
+    return (
+        db.query(models.BillTo)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
 def patch_billto(db: Session, model_id: int, current_user_id: int, update_dict: dict):
     result = (
         db.query(models.BillTo)

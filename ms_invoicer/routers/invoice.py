@@ -97,7 +97,7 @@ def delete_invoice(
             file_name = file.s3_pdf_url.split("/")[3]
             files_to_delete.append(file_name)
         if file.s3_xlsx_url:
-            file_name = file.s3_pdf_url.split("/")[3]
+            file_name = file.s3_xlsx_url.split("/")[3]
             files_to_delete.append(file_name)
     crud.delete_files_by_invoice(
         db=db, model_id=model_id, current_user_id=current_user.id

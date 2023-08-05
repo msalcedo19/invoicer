@@ -55,4 +55,4 @@ def delete_bill_to(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return crud.delete_billto(db=db, model_id=model_id, current_user_id=current_user.id)
+    return crud.patch_billto(db=db, model_id=model_id, current_user_id=current_user.id, update_dict={"user_id": None})
