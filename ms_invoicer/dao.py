@@ -1,3 +1,4 @@
+from typing import List
 from ms_invoicer.event_bus import Event
 from ms_invoicer.sql_app.schemas import File, Invoice
 
@@ -12,7 +13,7 @@ class FilesToProcessEvent(Event):
         price_unit: int,
         col_letter: str,
         currency: str,
-        with_taxes: bool,
+        pages: List[str] = []
     ) -> None:
         self.xlsx_url = file_path
         self.file_id = file_id
@@ -21,7 +22,7 @@ class FilesToProcessEvent(Event):
         self.price_unit = price_unit
         self.col_letter = col_letter
         self.currency = currency
-        self.with_taxes = with_taxes
+        self.pages = pages
 
 
 class PdfToProcessEvent(Event):
@@ -37,7 +38,6 @@ class PdfToProcessEvent(Event):
         html_template_name: str,
         xlsx_url: str,
         with_file: bool = True,
-        with_taxes=True,
     ):
         self.current_user_id = current_user_id
         self.invoice = invoice
@@ -45,7 +45,6 @@ class PdfToProcessEvent(Event):
         self.html_template_name = html_template_name
         self.xlsx_url = xlsx_url
         self.with_file = with_file
-        self.with_taxes = with_taxes
 
 
 class GenerateFinalPDF(Event):

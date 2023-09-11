@@ -1,5 +1,6 @@
+from ctypes import Union
 import logging
-from typing import Dict, List
+from typing import Dict, List, Union
 import openpyxl
 
 from datetime import datetime
@@ -16,19 +17,35 @@ from ms_invoicer.db_pool import get_db
 from ms_invoicer.event_bus import publish
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.sql_app.models import Invoice, User
-from ms_invoicer.utils import save_file, find_ranges, upload_file
+from ms_invoicer.utils import remove_file, save_file, find_ranges, upload_file
 
 log = logging.getLogger(__name__)
 
 
+def extract_pages(file: Union[UploadFile, None], current_user_id: int) -> List[str]:
+    log.info("Customer {} - Getting pages - fun: get_pages".format(current_user_id))
+    date_now = datetime.now()
+    filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
+    filename = filename.replace(" ", "_")
+    file_path = "temp/xlsx/{}".format(filename)
+    save_file(file_path, file)
+    xlsx_file = Path(file_path)
+    wb_obj = openpyxl.load_workbook(xlsx_file)
+    results = wb_obj.sheetnames
+    remove_file(file_path)
+    return results
+
+
 async def process_file(
-    file: UploadFile,
+    file: Union[UploadFile, None],
     invoice_id: int,
     bill_to_id: int,
     current_user_id: int,
     col_letter: str = "F",
-    with_taxes: bool = True
+    pages: List[str] = []
 ) -> schemas.File:
+    if file is None:
+        return None, None
     try:
         log.info("Customer {} - Processing file - fun: process_file".format(current_user_id))
         date_now = datetime.now()
@@ -61,11 +78,11 @@ async def process_file(
             price_unit=price_unit,
             col_letter=col_letter,
             currency=currency,
-            with_taxes=with_taxes
+            pages=pages
         )
         log.info("Customer {} - Publishing process event - fun: process_file".format(current_user_id))
         await publish(data_event)
-        return new_file
+        return new_file, file_path
     except Exception as e:
         log.error("Customer {} - Failure processing file - fun: process_file - err: {}".format(current_user_id, e))
         raise
@@ -82,6 +99,8 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
         xlsx_file = Path(event.xlsx_url)
         wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
         for sheet_name in wb_obj.sheetnames:
+            if sheet_name not in event.pages:
+                continue
             sheet: Cell = wb_obj[sheet_name]
 
             ranges = find_ranges(sheet)
@@ -147,7 +166,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             db=conn, current_user_id=event.current_user_id
         )
         template_name = "template01.html"
-        if not event.with_taxes:
+        if not invoice_obj.with_taxes:
             template_name = "template03.html"
         elif template:
             template_name = template.name
@@ -157,11 +176,10 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             invoice=invoice_obj,
             file=file_obj,
             html_template_name=template_name,
-            xlsx_url=event.xlsx_url,
-            with_taxes=event.with_taxes
+            xlsx_url=event.xlsx_url
         )
         log.info("Customer {} - Publishing pdf event - fun: extract_data".format(event.current_user_id))
-        await publish(data_event)
+        # await publish(data_event)
         event_handled = True
         return event_handled
     except Exception as e:
@@ -169,19 +187,24 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
         raise
 
 
-async def process_pdf(db: Session, invoice: Invoice, bill_to_id: int, contracts: List[schemas.ServiceCreateNoFile], current_user: User, with_taxes: bool):
-    log.info("Customer {} - Processing file without file - fun: process_pdf".format(current_user.id))
-    file_obj = schemas.FileCreate(
-        **{
-            "s3_xlsx_url": None,
-            "s3_pdf_url": None,
-            "created": datetime.now(),
-            "invoice_id": invoice.id,
-            "bill_to_id": bill_to_id,
-            "user_id": current_user.id,
-        }
-    )
-    new_file = crud.create_file(db=db, model=file_obj)
+async def process_pdf(db: Session, invoice: Invoice, bill_to_id: int, contracts: List[schemas.ServiceCreateNoFile], current_user: User, new_file_obj: schemas.File, xlsx_local_path: str):
+    log.info("Customer {} - Processing file without file - fun: process_pdf".format(current_user.id)) #TODO: Modificar mensajes
+    with_file = False
+    if not new_file_obj:
+        file_obj = schemas.FileCreate(
+            **{
+                "s3_xlsx_url": None,
+                "s3_pdf_url": None,
+                "created": datetime.now(),
+                "invoice_id": invoice.id,
+                "bill_to_id": bill_to_id,
+                "user_id": current_user.id,
+            }
+        )
+        new_file = crud.create_file(db=db, model=file_obj)
+    else:
+        new_file = new_file_obj
+        with_file = True
     log.info("Customer {} - File created - fun: process_pdf".format(current_user.id))
 
     result = []
@@ -196,16 +219,15 @@ async def process_pdf(db: Session, invoice: Invoice, bill_to_id: int, contracts:
     log.info("Customer {} - Contracts created - fun: process_pdf".format(current_user.id))
 
     template_name = "template01.html"
-    if not with_taxes:
+    if not invoice.with_taxes:
         template_name = "template03.html"
     data_event = PdfToProcessEvent(
         current_user_id=current_user.id,
         invoice=invoice,
         file=new_file,
         html_template_name=template_name,
-        xlsx_url=None,
-        with_file=False,
-        with_taxes=with_taxes
+        xlsx_url=xlsx_local_path,
+        with_file=with_file
     )
     log.info("Customer {} - Publishing pdf event - fun: process_pdf".format(current_user.id))
     await publish(data_event)

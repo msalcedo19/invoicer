@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Union
+from typing import List, Union, Optional
 
 from pydantic import BaseModel
 
@@ -181,8 +181,9 @@ class CustomerLite(CustomerBase):
 class InvoiceBase(BaseModel):
     number_id: int
     reason: str
-    tax_1: float
-    tax_2: float
+    tax_1: Optional[float]
+    tax_2: Optional[float]
+    with_taxes: Optional[bool]
     created: datetime
     updated: datetime
     customer_id: int

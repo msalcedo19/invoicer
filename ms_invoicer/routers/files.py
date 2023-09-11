@@ -1,12 +1,13 @@
 import logging
-from typing import Optional, Union, List
+import json
+from typing import Dict, Optional, Union, List
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, Form, UploadFile, status, HTTPException
 from sqlalchemy.orm import Session
 
 from ms_invoicer.db_pool import get_db
-from ms_invoicer.file_helpers import process_file, process_pdf
+from ms_invoicer.file_helpers import extract_pages, process_file, process_pdf
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 
@@ -15,11 +16,10 @@ log = logging.getLogger(__name__)
 
 
 class Generate_PDF(BaseModel):
-    bill_to_id: str
-    invoice: Optional[schemas.InvoiceBase]
-    contracts: List[schemas.ServiceCreateNoFile]
-    use_existing_invoice: bool = False
-    with_taxes: bool = True
+    bill_to_id: str = Form(),
+    invoice: Optional[schemas.InvoiceBase] = Form(),
+    contracts: List[schemas.ServiceCreateNoFile] = Form(),
+    file: Optional[UploadFile] = Form()
 
 
 @router.get("/files/{file_id}", response_model=schemas.File)
@@ -76,7 +76,6 @@ async def create_upload_file(
     invoice_id: str = Form(),
     bill_to_id: str = Form(),
     file: UploadFile = Form(),
-    with_taxes: bool = Form(),
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -85,11 +84,19 @@ async def create_upload_file(
         invoice_id=int(invoice_id),
         bill_to_id=int(bill_to_id),
         current_user_id=current_user.id,
-        with_taxes=with_taxes,
     )
     return crud.get_file(
         db=db, model_id=file_created.id, current_user_id=current_user.id
     )
+
+@router.post("/get_pages", response_model=Dict[str, List[str]])
+async def get_pages(
+    file: UploadFile = Form(),
+    current_user: schemas.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    response = extract_pages(file=file, current_user_id=current_user.id)
+    return {"pages": response}
 
 
 @router.post("/file", response_model=schemas.File)
@@ -107,37 +114,76 @@ async def create_file(
 
 @router.post("/generate_pdf")
 async def generate_pdf(
-    body: Generate_PDF,
+    file: Optional[UploadFile] = Form(None),
+    invoice_number_id: str = Form(None),
+    invoice_customer_id: str = Form(None),
+    bill_to_id: str = Form(),
+    with_taxes: bool = Form(None),
+    invoice: Optional[str] = Form(None),
+    contracts: str = Form(),
+    pages: str = Form(),
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     result = None
     new_invoice = None
-    if body.invoice:
+
+    try:
+        if invoice:
+            invoice_schema = schemas.InvoiceBase(**json.loads(invoice))
+            if with_taxes is not None:
+                invoice_schema.with_taxes = with_taxes
+            invoice: schemas.InvoiceBase = invoice_schema
+        contracts: List[schemas.ServiceCreateNoFile] = [schemas.ServiceCreateNoFile(**contract) for contract in json.loads(contracts)]
+        pages: List[str] = [page for page in json.loads(pages)]
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON data provided")
+
+    if invoice:
         result = crud.get_invoices_by_number_id(
             db=db,
-            number_id=body.invoice.number_id,
-            customer_id=body.invoice.customer_id,
+            number_id=invoice.number_id,
+            customer_id=invoice.customer_id,
             current_user_id=current_user.id,
         )
 
-    if not result or body.use_existing_invoice: # TODO: remover atributo innecesario o hacer mensaje en UI cuando se este usando
+    if not result:
         try:
             if result:
                 new_invoice = result
+            elif not invoice and invoice_customer_id is not None and invoice_number_id is not None:
+                new_invoice = crud.get_invoices_by_number_id(
+                    db=db,
+                    number_id=invoice_number_id,
+                    customer_id=invoice_customer_id,
+                    current_user_id=current_user.id,
+                )
+                if with_taxes is not None:
+                    crud.patch_invoice(db=db, model_id=new_invoice.id, current_user_id=current_user.id, update_dict={"with_taxes": with_taxes}) #TODO: Manejar evento cuando falla la actualización
+                    new_invoice.with_taxes = with_taxes
             else:
-                obj_dict = body.invoice.dict()
+                obj_dict = invoice.dict()
                 obj_dict["user_id"] = current_user.id
                 new_invoice = crud.create_invoice(
                     db=db, model=schemas.InvoiceCreate(**obj_dict)
                 )
+
+            file_created, xlsx_local_path = await process_file(
+                file=file,
+                invoice_id=int(new_invoice.id),
+                bill_to_id=int(bill_to_id),
+                current_user_id=current_user.id,
+                pages=pages,
+            )
+
             return await process_pdf(
                 db=db,
                 invoice=new_invoice,
-                bill_to_id=body.bill_to_id,
-                contracts=body.contracts,
+                bill_to_id=bill_to_id,
+                contracts=contracts,
                 current_user=current_user,
-                with_taxes=body.with_taxes,
+                new_file_obj=file_created,
+                xlsx_local_path=xlsx_local_path
             )
         except Exception as e:
             log.error("Customer {} - {}".format(current_user.id, e))

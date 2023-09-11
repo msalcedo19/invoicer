@@ -52,6 +52,13 @@ def save_file(file_path: str, file: UploadFile):
         output_file.write(file.file.read())
 
 
+def remove_file(file_path: str):
+    if os.path.isfile(file_path):
+        os.remove(file_path)
+    else:
+        print(f"'{file_path}' not found!")
+
+
 def find_ranges(sheet: Worksheet) -> List[tuple]:
     """
     This function takes an Excel worksheet (using the openpyxl library) as input,
