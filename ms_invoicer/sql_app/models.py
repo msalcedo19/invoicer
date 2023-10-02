@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Double, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Double, ForeignKey, Integer, String, Boolean
 from sqlalchemy.orm import relationship
 
 from ms_invoicer.sql_app.database import Base
@@ -28,6 +28,7 @@ class Invoice(Base):
     tax_2 = Column(Double)
     created = Column(DateTime)
     updated = Column(DateTime)
+    with_taxes = Column(Boolean)
     customer_id = Column(Integer, ForeignKey("customers.id"))
     user_id = Column(Integer, ForeignKey("invoicer_user.id"), index=True)
 
