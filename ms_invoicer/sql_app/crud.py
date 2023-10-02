@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from sqlalchemy.orm import Session
@@ -361,6 +362,18 @@ def get_invoices_by_customer(db: Session, model_id: int, current_user_id: int):
         .filter(
             models.Invoice.customer_id == model_id,
             models.Invoice.user_id == current_user_id,
+        )
+        .all()
+    )
+
+
+def get_invoices_by_customer_and_date_range(db: Session, model_id: int, current_user_id: int, start_date: datetime, end_date: datetime):
+    return (
+        db.query(models.Invoice)
+        .filter(
+            models.Invoice.customer_id == model_id,
+            models.Invoice.user_id == current_user_id,
+            models.Invoice.created.between(start_date, end_date),
         )
         .all()
     )

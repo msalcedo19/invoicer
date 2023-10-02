@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 import logging
 import os
 import boto3
@@ -12,6 +12,22 @@ from openpyxl.cell.cell import Cell
 from ms_invoicer.config import S3_ACCESS_KEY, S3_SECRET_ACCESS_KEY
 
 log = logging.getLogger(__name__)
+
+
+MONTH_NAMES_FRENCH = {
+    1: 'Janvier',
+    2: 'Février',
+    3: 'Mars',
+    4: 'Avril',
+    5: 'Mai',
+    6: 'Juin',
+    7: 'Juillet',
+    8: 'Août',
+    9: 'Septembre',
+    10: 'Octobre',
+    11: 'Novembre',
+    12: 'Décembre'
+}
 
 
 def check_dates(base_date: datetime, date1: time, date2: time = None) -> datetime:
@@ -163,6 +179,28 @@ def upload_file(
         raise Exception("Failure uploading file")
 
 
+def download_file_from_s3(
+    file_path_s3: str,
+    path_to_save: str,
+    bucket="invoicer-dev-01",
+):
+    try:
+        session: boto3.Session = boto3.session.Session()
+        s3 = session.client(
+            "s3",
+            aws_access_key_id=S3_ACCESS_KEY,
+            aws_secret_access_key=S3_SECRET_ACCESS_KEY,
+        )
+
+        # Download the file
+        s3.download_file(bucket, file_path_s3, path_to_save)
+        if not os.path.exists(path_to_save):
+            raise Exception("Failure downloading file")
+    except Exception as e:
+        log.error(e)
+        raise Exception("Failure downloading file")
+
+
 def delete_file_from_s3(file_names: Union[str, list], bucket_name="invoicer-dev-01"):
     try:
         # Create a session using your AWS credentials
@@ -179,3 +217,10 @@ def delete_file_from_s3(file_names: Union[str, list], bucket_name="invoicer-dev-
     except Exception as e:
         log.error(e)
         raise Exception("Failure deleting file")
+
+
+def extract_and_get_month_name(date: datetime) -> Optional[str]:
+    month = date.month
+    if month in MONTH_NAMES_FRENCH:
+        return MONTH_NAMES_FRENCH[month]
+    return None

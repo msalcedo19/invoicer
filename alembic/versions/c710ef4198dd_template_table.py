@@ -36,4 +36,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    pass
+    op.drop_table(Template.__tablename__)

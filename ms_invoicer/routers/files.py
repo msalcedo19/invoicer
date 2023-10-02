@@ -1,13 +1,20 @@
+from datetime import datetime
 import logging
 import json
 from typing import Dict, Optional, Union, List
 from pydantic import BaseModel
 
-from fastapi import APIRouter, Depends, Form, UploadFile, status, HTTPException
+from fastapi import APIRouter, Depends, Form, UploadFile, status, HTTPException, Body
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from ms_invoicer.db_pool import get_db
-from ms_invoicer.file_helpers import extract_pages, process_file, process_pdf
+from ms_invoicer.file_helpers import (
+    extract_pages,
+    generate_summary_by_date,
+    process_file,
+    process_pdf,
+)
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 
@@ -16,9 +23,9 @@ log = logging.getLogger(__name__)
 
 
 class Generate_PDF(BaseModel):
-    bill_to_id: str = Form(),
-    invoice: Optional[schemas.InvoiceBase] = Form(),
-    contracts: List[schemas.ServiceCreateNoFile] = Form(),
+    bill_to_id: str = (Form(),)
+    invoice: Optional[schemas.InvoiceBase] = (Form(),)
+    contracts: List[schemas.ServiceCreateNoFile] = (Form(),)
     file: Optional[UploadFile] = Form()
 
 
@@ -89,6 +96,37 @@ async def create_upload_file(
         db=db, model_id=file_created.id, current_user_id=current_user.id
     )
 
+
+class SummaryRequest(BaseModel):
+    customer_id: str
+    start_date: str
+    end_date: str
+
+
+@router.post("/summary")
+async def generate_summary(
+    summary_request: SummaryRequest = Body(...),
+    current_user: schemas.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Define the format of your date string
+    date_format = "%Y-%m-%d"
+
+    # Parse the string into a datetime object
+    start_parsed_date = datetime.strptime(summary_request.start_date, date_format)
+    start_parsed_date = start_parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_parsed_date = datetime.strptime(summary_request.end_date, date_format)
+    end_parsed_date = end_parsed_date.replace(hour=23, minute=59, second=59, microsecond=99)
+    file_path = await generate_summary_by_date(
+        db=db,
+        customer_id=summary_request.customer_id,
+        current_user=current_user,
+        start_date=start_parsed_date,
+        end_date=end_parsed_date,
+    )
+    return {"s3_file_path": file_path}
+
+
 @router.post("/get_pages", response_model=Dict[str, List[str]])
 async def get_pages(
     file: UploadFile = Form(),
@@ -134,7 +172,10 @@ async def generate_pdf(
             if with_taxes is not None:
                 invoice_schema.with_taxes = with_taxes
             invoice: schemas.InvoiceBase = invoice_schema
-        contracts: List[schemas.ServiceCreateNoFile] = [schemas.ServiceCreateNoFile(**contract) for contract in json.loads(contracts)]
+        contracts: List[schemas.ServiceCreateNoFile] = [
+            schemas.ServiceCreateNoFile(**contract)
+            for contract in json.loads(contracts)
+        ]
         pages: List[str] = [page for page in json.loads(pages)]
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON data provided")
@@ -151,7 +192,11 @@ async def generate_pdf(
         try:
             if result:
                 new_invoice = result
-            elif not invoice and invoice_customer_id is not None and invoice_number_id is not None:
+            elif (
+                not invoice
+                and invoice_customer_id is not None
+                and invoice_number_id is not None
+            ):
                 new_invoice = crud.get_invoices_by_number_id(
                     db=db,
                     number_id=invoice_number_id,
@@ -159,7 +204,12 @@ async def generate_pdf(
                     current_user_id=current_user.id,
                 )
                 if with_taxes is not None:
-                    crud.patch_invoice(db=db, model_id=new_invoice.id, current_user_id=current_user.id, update_dict={"with_taxes": with_taxes}) #TODO: Manejar evento cuando falla la actualización
+                    crud.patch_invoice(
+                        db=db,
+                        model_id=new_invoice.id,
+                        current_user_id=current_user.id,
+                        update_dict={"with_taxes": with_taxes},
+                    )  # TODO: Manejar evento cuando falla la actualización
                     new_invoice.with_taxes = with_taxes
             else:
                 obj_dict = invoice.dict()
@@ -183,7 +233,7 @@ async def generate_pdf(
                 contracts=contracts,
                 current_user=current_user,
                 new_file_obj=file_created,
-                xlsx_local_path=xlsx_local_path
+                xlsx_local_path=xlsx_local_path,
             )
         except Exception as e:
             log.error("Customer {} - {}".format(current_user.id, e))
