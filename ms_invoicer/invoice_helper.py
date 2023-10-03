@@ -45,6 +45,9 @@ async def build_pdf(event: PdfToProcessEvent):
         event.file = crud.get_file(
             db=connection, current_user_id=event.current_user_id, model_id=event.file.id
         )
+        event.invoice = crud.get_invoice(
+            db=connection, current_user_id=event.current_user_id, model_id=event.invoice.id
+        )
         with open(input_html_path) as fp:
             soup = BeautifulSoup(fp, "html.parser")
 
@@ -160,6 +163,10 @@ async def build_pdf(event: PdfToProcessEvent):
             template = template_env.get_template(event.html_template_name)
             output_text = template.render(context)
 
+            if not service_info:
+                searched_file = crud.get_file(db=connection, model_id=event.file.id, current_user_id=event.current_user_id)
+                if searched_file and len(searched_file.services) > 0:
+                    service_info = searched_file.services[0]
             filename = f"facture_{event.invoice.number_id}_{service_info.title}_{event.invoice.created.strftime('%m_%Y')}-{str(uuid4())}.pdf"
             filename = filename.replace(" ", "_")
             output_pdf_path: str = "temp/pdf/{}".format(filename)
