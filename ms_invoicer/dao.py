@@ -38,6 +38,7 @@ class PdfToProcessEvent(Event):
         html_template_name: str,
         xlsx_url: str,
         with_file: bool = True,
+        pages: List[str] = []
     ):
         self.current_user_id = current_user_id
         self.invoice = invoice
@@ -45,6 +46,7 @@ class PdfToProcessEvent(Event):
         self.html_template_name = html_template_name
         self.xlsx_url = xlsx_url
         self.with_file = with_file
+        self.pages = pages
 
 
 class GenerateFinalPDF(Event):
@@ -72,11 +74,13 @@ class GenerateFinalPDFWithFile(GenerateFinalPDF):
         pdf_invoice: str,
         filename: str,
         file_id: int,
+        pages: List[str] = []
     ):
         super().__init__(current_user_id=current_user_id, filename=filename, file_id=file_id)
         self.path_pdf_tables = pdf_tables
         self.xlsx_url = xlsx_url
         self.path_pdf_invoice = pdf_invoice
+        self.pages = pages
 
 
 class GenerateFinalPDFNoFile(GenerateFinalPDF):

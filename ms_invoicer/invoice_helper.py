@@ -183,6 +183,7 @@ async def build_pdf(event: PdfToProcessEvent):
                     pdf_invoice=output_pdf_path,
                     filename=filename,
                     file_id=event.file.id,
+                    pages=event.pages,
                 )
             else:
                 data_event = GenerateFinalPDFNoFile(
@@ -244,6 +245,8 @@ def generate_invoice(event: GenerateFinalPDFWithFile):
 
         # Select the worksheet with the table
         for sheet_name in wb.sheetnames:
+            if sheet_name not in event.pages:
+                continue
             ws = wb[sheet_name]
 
             ranges = find_ranges(ws)
