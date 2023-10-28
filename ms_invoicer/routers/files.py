@@ -5,7 +5,6 @@ from typing import Dict, Optional, Union, List
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, Form, UploadFile, status, HTTPException, Body
-from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from ms_invoicer.db_pool import get_db
@@ -189,10 +188,9 @@ async def generate_pdf(
         )
 
     if not result:
+        invoice_created = False
         try:
-            if result:
-                new_invoice = result
-            elif (
+            if (
                 not invoice
                 and invoice_customer_id is not None
                 and invoice_number_id is not None
@@ -217,6 +215,7 @@ async def generate_pdf(
                 new_invoice = crud.create_invoice(
                     db=db, model=schemas.InvoiceCreate(**obj_dict)
                 )
+                invoice_created = True
 
             file_created, xlsx_local_path = await process_file(
                 file=file,
@@ -234,23 +233,29 @@ async def generate_pdf(
                 current_user=current_user,
                 new_file_obj=file_created,
                 xlsx_local_path=xlsx_local_path,
+                pages=pages,
             )
         except Exception as e:
             log.error("Customer {} - {}".format(current_user.id, e))
-            if new_invoice:
-                files = crud.get_files_by_invoice(
-                    db=db, model_id=new_invoice.id, current_user_id=current_user.id
+            files = crud.get_files_by_invoice(
+                db=db, model_id=new_invoice.id, current_user_id=current_user.id
+            )
+            files = sorted(files, key=lambda x: x.created, reverse=True)
+            if len(files) > 0:
+                crud.delete_services_by_file(
+                    db=db, model_id=files[0].id, current_user_id=current_user.id
                 )
-                for file in files:
-                    crud.delete_services_by_file(
-                        db=db, model_id=file.id, current_user_id=current_user.id
-                    )
-                crud.delete_files_by_invoice(
-                    db=db, model_id=new_invoice.id, current_user_id=current_user.id
-                )
+                crud.delete_file(db=db, model_id=files[0].id, current_user_id=current_user.id)
+
+            if invoice_created:
                 crud.delete_invoice(
                     db=db, model_id=new_invoice.id, current_user_id=current_user.id
                 )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Error al generar la factura",
+            )
+
     else:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

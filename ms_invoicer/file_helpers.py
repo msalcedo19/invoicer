@@ -2,7 +2,6 @@ from ctypes import Union
 import logging
 import shutil
 import os
-from re import I
 from typing import Dict, List, Tuple, Union
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
@@ -131,12 +130,21 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             for range_of in ranges:
                 (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
                 if not invoice_update:
+                    parsed_date = str(sheet["{}{}".format("A", maxrow - 1)].value)
+                    date_formats = ['%d/%m/%Y %H:%M:%S', '%d/%m/%Y', '%d-%m-%Y %H:%M:%S', '%d-%m-%Y']
+                    for date_format in date_formats:
+                        try:
+                            parsed_date = datetime.strptime(parsed_date, date_format)
+                            break  # Break out of the loop if parsing is successful
+                        except ValueError:
+                            pass
+
                     crud.patch_invoice(
                         db=conn,
                         model_id=event.invoice_id,
                         current_user_id=event.current_user_id,
                         update_dict={
-                            "created": sheet["{}{}".format("A", maxrow - 1)].value
+                            "created": parsed_date
                         },
                     )
                     invoice_update = True
@@ -226,6 +234,7 @@ async def process_pdf(
     current_user: User,
     new_file_obj: schemas.File,
     xlsx_local_path: str,
+    pages: List[str] = [],
 ):
     log.info(
         "Customer {} - Processing file without file - fun: process_pdf".format(
@@ -273,6 +282,7 @@ async def process_pdf(
         html_template_name=template_name,
         xlsx_url=xlsx_local_path,
         with_file=with_file,
+        pages=pages,
     )
     log.info(
         "Customer {} - Publishing pdf event - fun: process_pdf".format(current_user.id)
@@ -301,15 +311,26 @@ async def generate_summary_by_date(
         files_list = crud.get_files_by_invoice(db=db, model_id=invoice.id, current_user_id=current_user.id)
         xlsx_list.extend(files_list)
 
-    xlsx_path_name_list: List[str] = []
+    class FileToProcess:
+
+        def __init__(self, filename: str, file_path: str, invoice_id: int) -> None:
+            self.filename = filename
+            self.file_path = file_path
+            self.invoice_id = invoice_id
+
+        def __str__(self) -> str:
+            return "file_path: {} - invoice_id: {}".format(self.file_path, self.invoice_id)
+
+    xlsx_path_name_list: List[FileToProcess] = []
     for xlsx in xlsx_list:
         filename = f"to_process_{xlsx.invoice_id}_{xlsx.id}_{xlsx.user_id}.xlsx"
         file_path = "temp/xlsx/{}".format(filename)
-        xlsx_path_name_list.append(file_path)
+        new_file_to_process = FileToProcess(filename, file_path, xlsx.invoice_id)
+        xlsx_path_name_list.append(new_file_to_process)
         if not os.path.exists(file_path) and xlsx.s3_xlsx_url is not None:
             splitted_name = xlsx.s3_xlsx_url.split("/")
             download_file_from_s3(file_path_s3=splitted_name[3], path_to_save=file_path, bucket=S3_BUCKET_NAME)
-        
+    xlsx_path_name_list = sorted(xlsx_path_name_list, key=lambda x: x.invoice_id)
     
     try:
         customer_obj = crud.get_customer(db=db, model_id=customer_id, current_user_id=current_user.id)
@@ -319,27 +340,27 @@ async def generate_summary_by_date(
         new_workbook = openpyxl.load_workbook(output_file_path)
         pair_sheet_names: Dict[str, List[Tuple]] = {}
         for path in xlsx_path_name_list:
-            xlsx_file = Path(path)
+            xlsx_file = Path(path.file_path)
             wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
 
-            if path not in pair_sheet_names:
-                pair_sheet_names[path] = []
+            if path.file_path not in pair_sheet_names:
+                pair_sheet_names[path.file_path] = []
 
             for _, sheet_name in enumerate(wb_obj.sheetnames):
                 sheet: Worksheet = wb_obj[sheet_name]
                 new_sheet: Worksheet = new_workbook["01"]
                 new_worksheet: Worksheet  = new_workbook.copy_worksheet(new_sheet)
-                pair_sheet_names[path].append((sheet.title, new_worksheet.title))
+                pair_sheet_names[path.file_path].append((sheet.title, new_worksheet.title))
 
         index_contract = 1
         for path in xlsx_path_name_list:
-            xlsx_file = Path(path)
+            xlsx_file = Path(path.file_path)
             wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
-            for (input_sheet_name, output_sheet_name) in pair_sheet_names[path]:
+            for (input_sheet_name, output_sheet_name) in pair_sheet_names[path.file_path]:
                 input_sheet: Worksheet = wb_obj[input_sheet_name]
 
                 new_sheet_wb: Worksheet = new_workbook[output_sheet_name]
-                new_sheet_wb.title = "Contrat {}".format(index_contract)
+                new_sheet_wb.title = "{}".format(index_contract)
                 index_contract += 1
 
                 ranges = find_ranges(input_sheet)
