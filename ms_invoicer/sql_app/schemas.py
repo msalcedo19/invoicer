@@ -84,7 +84,7 @@ class Global(GlobalBase):
 # SERVICE -------------------------------------------------------------
 class ServiceBase(BaseModel):
     title: str
-    amount: int
+    amount: float
     currency: str
     hours: float
     price_unit: float
@@ -97,7 +97,7 @@ class ServiceCreate(ServiceBase):
 
 class ServiceCreateNoFile(BaseModel):
     title: str
-    amount: int
+    amount: float
     currency: str
     hours: float
     price_unit: float
