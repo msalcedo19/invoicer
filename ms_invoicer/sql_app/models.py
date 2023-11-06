@@ -78,6 +78,7 @@ class File(Base):
     id = Column(Integer, primary_key=True, index=True)
     s3_xlsx_url = Column(String)
     s3_pdf_url = Column(String)
+    pages_xlsx = Column(String)
     created = Column(DateTime)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
     bill_to_id = Column(Integer, ForeignKey("billto.id"))

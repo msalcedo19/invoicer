@@ -74,6 +74,7 @@ async def process_file(
                 "s3_xlsx_url": s3_url,
                 "s3_pdf_url": None,
                 "created": datetime.now(),
+                "pages_xlsx": ",".join(pages),
                 "invoice_id": invoice_id,
                 "bill_to_id": bill_to_id,
                 "user_id": current_user_id,
@@ -248,6 +249,7 @@ async def process_pdf(
                 "s3_xlsx_url": None,
                 "s3_pdf_url": None,
                 "created": datetime.now(),
+                "pages_xlsx": ",".join(pages),
                 "invoice_id": invoice.id,
                 "bill_to_id": bill_to_id,
                 "user_id": current_user.id,
@@ -288,6 +290,12 @@ async def process_pdf(
         "Customer {} - Publishing pdf event - fun: process_pdf".format(current_user.id)
     )
     await publish(data_event)
+    crud.patch_invoice(
+        db=db,
+        model_id=invoice.id,
+        current_user_id=current_user.id,
+        update_dict={"updated": datetime.now()},
+    )
     return crud.get_file(db=db, model_id=new_file.id, current_user_id=current_user.id)
 
 
@@ -309,23 +317,25 @@ async def generate_summary_by_date(
     xlsx_list: List[models.File] = []
     for invoice in invoices_by_customer:
         files_list = crud.get_files_by_invoice(db=db, model_id=invoice.id, current_user_id=current_user.id)
-        xlsx_list.extend(files_list)
+        if len(files_list) > 0:
+            xlsx_list.append(files_list[0])
 
     class FileToProcess:
 
-        def __init__(self, filename: str, file_path: str, invoice_id: int) -> None:
+        def __init__(self, filename: str, file_path: str, invoice_id: int, pages_xlsx: str) -> None:
             self.filename = filename
             self.file_path = file_path
             self.invoice_id = invoice_id
+            self.pages_xlsx = pages_xlsx
 
         def __str__(self) -> str:
-            return "file_path: {} - invoice_id: {}".format(self.file_path, self.invoice_id)
+            return "file_path: {} - invoice_id: {}".format(self.file_path, self.invoice_id, self.pages_xlsx)
 
     xlsx_path_name_list: List[FileToProcess] = []
     for xlsx in xlsx_list:
         filename = f"to_process_{xlsx.invoice_id}_{xlsx.id}_{xlsx.user_id}.xlsx"
         file_path = "temp/xlsx/{}".format(filename)
-        new_file_to_process = FileToProcess(filename, file_path, xlsx.invoice_id)
+        new_file_to_process = FileToProcess(filename, file_path, xlsx.invoice_id, xlsx.pages_xlsx)
         xlsx_path_name_list.append(new_file_to_process)
         if not os.path.exists(file_path) and xlsx.s3_xlsx_url is not None:
             splitted_name = xlsx.s3_xlsx_url.split("/")
@@ -345,9 +355,15 @@ async def generate_summary_by_date(
 
             if path.file_path not in pair_sheet_names:
                 pair_sheet_names[path.file_path] = []
-
+            pages_xlsx: List[str] = []
+            should_check = False
+            if path.pages_xlsx is not None and path.pages_xlsx != "":
+                pages_xlsx = path.pages_xlsx.split(",")
+                should_check = True
             for _, sheet_name in enumerate(wb_obj.sheetnames):
                 sheet: Worksheet = wb_obj[sheet_name]
+                if should_check and sheet_name not in pages_xlsx:
+                    continue
                 new_sheet: Worksheet = new_workbook["01"]
                 new_worksheet: Worksheet  = new_workbook.copy_worksheet(new_sheet)
                 pair_sheet_names[path.file_path].append((sheet.title, new_worksheet.title))

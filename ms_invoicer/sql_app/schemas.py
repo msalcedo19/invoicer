@@ -151,6 +151,7 @@ class TopInfo(TopInfoBase):
 class FileBase(BaseModel):
     s3_xlsx_url: Union[str, None]
     s3_pdf_url: Union[str, None]
+    pages_xlsx: Union[str, None]
     created: datetime
     invoice_id: int
     bill_to_id: int

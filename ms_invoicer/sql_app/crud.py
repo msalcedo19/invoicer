@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List
 
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 from ms_invoicer.sql_app import models, schemas
 
@@ -186,6 +187,7 @@ def get_files_by_invoice(db: Session, model_id: int, current_user_id: int):
         .filter(
             models.File.invoice_id == model_id, models.File.user_id == current_user_id
         )
+        .order_by(desc(models.File.created))
         .all()
     )
 
