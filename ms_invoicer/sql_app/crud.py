@@ -130,11 +130,34 @@ def get_customers(
     )
 
 
+def get_all_customers(
+    db: Session, skip: int = 0, limit: int = 100
+) -> List[models.Customer]:
+    return (
+        db.query(models.Customer)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
 def patch_customer(db: Session, model_id: int, current_user_id: int, update_dict: dict):
     result = (
         db.query(models.Customer)
         .filter(
             models.Customer.id == model_id, models.Customer.user_id == current_user_id
+        )
+        .update(update_dict)
+    )
+    db.commit()
+    return result
+
+
+def patch_all_customer_by_user_id(db: Session, user_id: int, update_dict: dict):
+    result = (
+        db.query(models.Customer)
+        .filter(
+            models.Customer.user_id == user_id
         )
         .update(update_dict)
     )
@@ -196,6 +219,18 @@ def patch_file(db: Session, model_id: int, current_user_id: int, update_dict: di
     result = (
         db.query(models.File)
         .filter(models.File.id == model_id, models.File.user_id == current_user_id)
+        .update(update_dict)
+    )
+    db.commit()
+    return result
+
+
+def patch_all_files_by_invoice_user_id(db: Session, user_id: int, invoice_id: int, update_dict: dict):
+    result = (
+        db.query(models.File)
+        .filter(
+            models.File.user_id == user_id, models.File.invoice_id == invoice_id
+        )
         .update(update_dict)
     )
     db.commit()
@@ -417,6 +452,18 @@ def patch_invoice(db: Session, model_id: int, current_user_id: int, update_dict:
     return result
 
 
+def patch_all_invoice_by_customer_user_id(db: Session, customer_id: int, user_id: int, update_dict: dict):
+    result = (
+        db.query(models.Invoice)
+        .filter(
+            models.Invoice.user_id == user_id, models.Invoice.customer_id == customer_id
+        )
+        .update(update_dict)
+    )
+    db.commit()
+    return result
+
+
 def delete_invoice(db: Session, model_id: int, current_user_id: int):
     result = (
         db.query(models.Invoice)
@@ -459,6 +506,10 @@ def create_user(db: Session, model: schemas.UserCreate):
 
 def get_user_by_username(db: Session, username: str):
     return db.query(models.User).filter(models.User.username == username).first()
+
+
+def get_users(db: Session):
+    return db.query(models.User).all()
 
 
 def delete_user(db: Session, model_id: int):

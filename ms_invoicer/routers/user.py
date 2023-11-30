@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import List
 
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,6 +15,7 @@ from ms_invoicer.security_helper import (
 )
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.config import ACCESS_TOKEN_EXPIRE_MINUTES
+from ms_invoicer.utils import get_current_date
 
 router = APIRouter()
 
@@ -55,9 +57,15 @@ def check_password(
 @router.post("/user", response_model=schemas.User)
 def create_user(model: dict, db: Session = Depends(get_db)):
     user = crud.get_user_by_username(db=db, username=model["username"])
+    current_date = get_current_date()
     if not user:
         model["hashpass"] = get_password_hash(model["password"])
-        model["created"] = datetime.now()
-        model["updated"] = datetime.now()
+        model["created"] = current_date
+        model["updated"] = current_date
         del model["password"]
     return crud.create_user(db=db, model=schemas.UserCreate(**model))
+
+
+@router.get("/get_all_users", response_model=List[schemas.User])
+def get_all_user(db: Session = Depends(get_db)):
+    return crud.get_users(db=db)

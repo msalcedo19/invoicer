@@ -99,3 +99,40 @@ def post_customer(
     obj_dict = customer.dict()
     obj_dict["user_id"] = current_user.id
     return crud.create_customer(db=db, model=schemas.CustomerCreate(**obj_dict))
+
+
+@router.get("/get_all_customer", response_model=list[schemas.Customer])
+async def get_all_customers(
+    current_user: schemas.User = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    return crud.get_all_customers(
+        db=db, skip=skip, limit=limit
+    )
+
+
+@router.patch("/update_customer_data")
+def patch_invoice(
+    customer_id: int,
+    new_user_id: int,
+    current_user: schemas.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    model_update = {
+        "user_id": new_user_id
+    }
+
+    result = crud.patch_all_customer_by_user_id(
+        db=db,
+        user_id=current_user.id,
+        update_dict=model_update,
+    )
+    result = crud.patch_all_invoice_by_customer_user_id(
+        db=db,
+        customer_id=customer_id,
+        user_id=current_user.id,
+        update_dict=model_update,
+    )
+    return {"rows affected": result}

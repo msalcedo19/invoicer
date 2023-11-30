@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import UploadFile
+from fastapi import UploadFile, status, HTTPException
 from sqlalchemy.orm import Session
 from openpyxl.cell.cell import Cell
 from ms_invoicer.config import S3_BUCKET_NAME
@@ -21,23 +21,40 @@ from ms_invoicer.event_bus import publish
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.sql_app import models
 from ms_invoicer.sql_app.models import Invoice, User
-from ms_invoicer.utils import download_file_from_s3, extract_and_get_month_name, remove_file, save_file, find_ranges, upload_file
+from ms_invoicer.utils import (
+    download_file_from_s3,
+    extract_and_get_month_name,
+    remove_file,
+    save_file,
+    find_ranges,
+    upload_file,
+    get_current_date,
+)
 
 log = logging.getLogger(__name__)
 
 
-def extract_pages(file: Union[UploadFile, None], current_user_id: int) -> List[str]:
+def extract_pages(uploaded_file: UploadFile, current_user_id: int) -> List[str]:
     log.info("Customer {} - Getting pages - fun: get_pages".format(current_user_id))
-    date_now = datetime.now()
-    filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
-    filename = filename.replace(" ", "_")
-    file_path = "temp/xlsx/{}".format(filename)
-    save_file(file_path, file)
-    xlsx_file = Path(file_path)
-    wb_obj = openpyxl.load_workbook(xlsx_file)
-    results = wb_obj.sheetnames
-    remove_file(file_path)
-    return results
+    try:
+        date_now = get_current_date()
+
+        filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
+        filename = filename.replace(" ", "_")
+        file_path = "temp/xlsx/{}".format(filename)
+        save_file(file_path, uploaded_file)
+
+        xlsx_file = Path(file_path)
+        wb_obj = openpyxl.load_workbook(xlsx_file)
+        results = wb_obj.sheetnames
+        remove_file(file_path)
+        return results
+    except Exception as e:
+        log.error(
+            "Customer {} - Error getting pages - fun: get_pages".format(current_user_id)
+        )
+        log.error(e)
+        return []
 
 
 async def process_file(
@@ -54,12 +71,11 @@ async def process_file(
         log.info(
             "Customer {} - Processing file - fun: process_file".format(current_user_id)
         )
-        date_now = datetime.now()
+        date_now = get_current_date()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
         filename = filename.replace(" ", "_")
         file_path = "temp/xlsx/{}".format(filename)
         save_file(file_path, file)
-        log.info("Customer {} - File saved - fun: process_file".format(current_user_id))
 
         price_unit = 1
         currency = "CAD"
@@ -73,7 +89,7 @@ async def process_file(
             **{
                 "s3_xlsx_url": s3_url,
                 "s3_pdf_url": None,
-                "created": datetime.now(),
+                "created": date_now.date(),
                 "pages_xlsx": ",".join(pages),
                 "invoice_id": invoice_id,
                 "bill_to_id": bill_to_id,
@@ -100,10 +116,11 @@ async def process_file(
         return new_file, file_path
     except Exception as e:
         log.error(
-            "Customer {} - Failure processing file - fun: process_file - err: {}".format(
-                current_user_id, e
+            "Customer {} - Failure processing file - fun: process_file".format(
+                current_user_id
             )
         )
+        log.error(e)
         raise
 
 
@@ -132,7 +149,12 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                 (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
                 if not invoice_update:
                     parsed_date = str(sheet["{}{}".format("A", maxrow - 1)].value)
-                    date_formats = ['%d/%m/%Y %H:%M:%S', '%d/%m/%Y', '%d-%m-%Y %H:%M:%S', '%d-%m-%Y']
+                    date_formats = [
+                        "%d/%m/%Y %H:%M:%S",
+                        "%d/%m/%Y",
+                        "%d-%m-%Y %H:%M:%S",
+                        "%d-%m-%Y",
+                    ]
                     for date_format in date_formats:
                         try:
                             parsed_date = datetime.strptime(parsed_date, date_format)
@@ -144,9 +166,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                         db=conn,
                         model_id=event.invoice_id,
                         current_user_id=event.current_user_id,
-                        update_dict={
-                            "created": parsed_date
-                        },
+                        update_dict={"created": parsed_date},
                     )
                     invoice_update = True
                 contract_dict = {}
@@ -184,46 +204,20 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                 service_created = schemas.ServiceCreate(**contract_dict)
                 crud.create_service(db=conn, model=service_created)
 
-        invoice_obj: schemas.Invoice = crud.get_invoice(
-            db=conn,
-            model_id=event.invoice_id,
-            current_user_id=event.current_user_id,
-        )
-        file_obj: schemas.File = crud.get_file(
-            db=conn,
-            model_id=event.file_id,
-            current_user_id=event.current_user_id,
-        )
-        template: schemas.Template = crud.get_template(
-            db=conn, current_user_id=event.current_user_id
-        )
-        template_name = "template01.html"
-        if not invoice_obj.with_taxes:
-            template_name = "template03.html"
-        elif template:
-            template_name = template.name
-
-        data_event = PdfToProcessEvent(
-            current_user_id=event.current_user_id,
-            invoice=invoice_obj,
-            file=file_obj,
-            html_template_name=template_name,
-            xlsx_url=event.xlsx_url,
-        )
         log.info(
-            "Customer {} - Publishing pdf event - fun: extract_data".format(
+            "Customer {} - Success extracting data - fun: extract_data".format(
                 event.current_user_id
             )
         )
-        # await publish(data_event)
         event_handled = True
         return event_handled
     except Exception as e:
         log.error(
-            "Customer {} - Failure extracting data - fun: extract_data - err: {}".format(
-                event.current_user_id, e
+            "Customer {} - Failure extracting data - fun: extract_data".format(
+                event.current_user_id
             )
         )
+        log.error(e)
         raise
 
 
@@ -238,17 +232,16 @@ async def process_pdf(
     pages: List[str] = [],
 ):
     log.info(
-        "Customer {} - Processing file without file - fun: process_pdf".format(
-            current_user.id
-        )
-    )  # TODO: Modificar mensajes
+        "Customer {} - Processing pdf_file - fun: process_pdf".format(current_user.id)
+    )
+    current_date = get_current_date()
     with_file = False
     if not new_file_obj:
         file_obj = schemas.FileCreate(
             **{
                 "s3_xlsx_url": None,
                 "s3_pdf_url": None,
-                "created": datetime.now(),
+                "created": current_date.date(),
                 "pages_xlsx": ",".join(pages),
                 "invoice_id": invoice.id,
                 "bill_to_id": bill_to_id,
@@ -256,10 +249,19 @@ async def process_pdf(
             }
         )
         new_file = crud.create_file(db=db, model=file_obj)
+        log.info(
+            "Customer {} - File without xlsx created - fun: process_pdf".format(
+                current_user.id
+            )
+        )
     else:
         new_file = new_file_obj
         with_file = True
-    log.info("Customer {} - File created - fun: process_pdf".format(current_user.id))
+        log.info(
+            "Customer {} - Using file with xlsx - fun: process_pdf".format(
+                current_user.id
+            )
+        )
 
     result = []
     for contract in contracts:
@@ -294,7 +296,7 @@ async def process_pdf(
         db=db,
         model_id=invoice.id,
         current_user_id=current_user.id,
-        update_dict={"updated": datetime.now()},
+        update_dict={"updated": current_date},
     )
     return crud.get_file(db=db, model_id=new_file.id, current_user_id=current_user.id)
 
@@ -306,6 +308,11 @@ async def generate_summary_by_date(
     start_date: datetime,
     end_date: datetime,
 ):
+    log.info(
+        "Customer {} - Generating summary - fun: generate_summary_by_date".format(
+            current_user.id
+        )
+    )
     invoices_by_customer = crud.get_invoices_by_customer_and_date_range(
         db=db,
         model_id=customer_id,
@@ -316,37 +323,62 @@ async def generate_summary_by_date(
 
     xlsx_list: List[models.File] = []
     for invoice in invoices_by_customer:
-        files_list = crud.get_files_by_invoice(db=db, model_id=invoice.id, current_user_id=current_user.id)
+        files_list = crud.get_files_by_invoice(
+            db=db, model_id=invoice.id, current_user_id=current_user.id
+        )
         if len(files_list) > 0:
             xlsx_list.append(files_list[0])
 
     class FileToProcess:
-
-        def __init__(self, filename: str, file_path: str, invoice_id: int, pages_xlsx: str) -> None:
+        def __init__(
+            self, filename: str, file_path: str, invoice_id: int, pages_xlsx: str
+        ) -> None:
             self.filename = filename
             self.file_path = file_path
             self.invoice_id = invoice_id
             self.pages_xlsx = pages_xlsx
 
         def __str__(self) -> str:
-            return "file_path: {} - invoice_id: {}".format(self.file_path, self.invoice_id, self.pages_xlsx)
+            return "file_path: {} - invoice_id: {}".format(
+                self.file_path, self.invoice_id, self.pages_xlsx
+            )
 
+    log.info(
+        "Customer {} - Downloading xlsx files - fun: generate_summary_by_date".format(
+            current_user.id
+        )
+    )
     xlsx_path_name_list: List[FileToProcess] = []
     for xlsx in xlsx_list:
         filename = f"to_process_{xlsx.invoice_id}_{xlsx.id}_{xlsx.user_id}.xlsx"
         file_path = "temp/xlsx/{}".format(filename)
-        new_file_to_process = FileToProcess(filename, file_path, xlsx.invoice_id, xlsx.pages_xlsx)
+        new_file_to_process = FileToProcess(
+            filename, file_path, xlsx.invoice_id, xlsx.pages_xlsx
+        )
         xlsx_path_name_list.append(new_file_to_process)
         if not os.path.exists(file_path) and xlsx.s3_xlsx_url is not None:
             splitted_name = xlsx.s3_xlsx_url.split("/")
-            download_file_from_s3(file_path_s3=splitted_name[3], path_to_save=file_path, bucket=S3_BUCKET_NAME)
+            download_file_from_s3(
+                file_path_s3=splitted_name[3],
+                path_to_save=file_path,
+                bucket=S3_BUCKET_NAME,
+            )
     xlsx_path_name_list = sorted(xlsx_path_name_list, key=lambda x: x.invoice_id)
-    
+
     try:
-        customer_obj = crud.get_customer(db=db, model_id=customer_id, current_user_id=current_user.id)
-        output_filename = "resumen_{}_{}_{}-{}_{}.xlsx".format(customer_obj.name.replace(" ", "_"), start_date.month, start_date.year, end_date.month, end_date.year)
+        customer_obj = crud.get_customer(
+            db=db, model_id=customer_id, current_user_id=current_user.id
+        )
+        output_filename = "resumen_{}_{}_{}-{}_{}.xlsx".format(
+            customer_obj.name.replace(" ", "_"),
+            start_date.month,
+            start_date.year,
+            end_date.month,
+            end_date.year,
+        )
         output_file_path = "temp/xlsx/{}".format(output_filename)
         shutil.copy("scripts/summary_template.xlsx", output_file_path)
+
         new_workbook = openpyxl.load_workbook(output_file_path)
         pair_sheet_names: Dict[str, List[Tuple]] = {}
         for path in xlsx_path_name_list:
@@ -362,17 +394,19 @@ async def generate_summary_by_date(
                 should_check = True
             for _, sheet_name in enumerate(wb_obj.sheetnames):
                 sheet: Worksheet = wb_obj[sheet_name]
-                if should_check and sheet_name not in pages_xlsx:
+                if should_check and sheet_name.replace(",", "-") not in pages_xlsx:
                     continue
                 new_sheet: Worksheet = new_workbook["01"]
-                new_worksheet: Worksheet  = new_workbook.copy_worksheet(new_sheet)
-                pair_sheet_names[path.file_path].append((sheet.title, new_worksheet.title))
+                new_worksheet: Worksheet = new_workbook.copy_worksheet(new_sheet)
+                pair_sheet_names[path.file_path].append(
+                    (sheet.title, new_worksheet.title)
+                )
 
         index_contract = 1
         for path in xlsx_path_name_list:
             xlsx_file = Path(path.file_path)
             wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
-            for (input_sheet_name, output_sheet_name) in pair_sheet_names[path.file_path]:
+            for input_sheet_name, output_sheet_name in pair_sheet_names[path.file_path]:
                 input_sheet: Worksheet = wb_obj[input_sheet_name]
 
                 new_sheet_wb: Worksheet = new_workbook[output_sheet_name]
@@ -393,9 +427,13 @@ async def generate_summary_by_date(
                                 cell_new_wb.value = row[2].value
 
                     if not period_extracted:
-                        new_sheet_wb["{}{}".format("C", 2)].value = extract_and_get_month_name(input_sheet["{}{}".format("A", minrow)].value)
+                        new_sheet_wb[
+                            "{}{}".format("C", 2)
+                        ].value = extract_and_get_month_name(
+                            input_sheet["{}{}".format("A", minrow)].value
+                        )
                         period_extracted = True
-                    
+
                     # Values
                     for col in range(minrow, maxrow):
                         input_date_value = input_sheet["{}{}".format("A", col)].value
@@ -422,7 +460,7 @@ async def generate_summary_by_date(
                         new_sheet_wb["{}{}".format("G", 38)].value = "=SUM(G22:G35)"
                         new_sheet_wb["{}{}".format("I", 36)].value = "=SUM(I6:I35)"
                         new_sheet_wb["{}{}".format("K", 36)].value = "=SUM(K6:K35)"
-                        
+
         original_sheet = new_workbook["01"]
         new_workbook.remove(original_sheet)
         new_workbook.save(output_file_path)
@@ -435,8 +473,12 @@ async def generate_summary_by_date(
 
     except Exception as e:
         log.error(
-            "Customer {} - Failure generating summary - fun: generate_summary_by_date - err: {}".format(
-                current_user.id, e
+            "Customer {} - Failure generating summary - fun: generate_summary_by_date".format(
+                current_user.id
             )
         )
-        raise
+        log.error(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Hubo un error generanto el resumen",
+        )

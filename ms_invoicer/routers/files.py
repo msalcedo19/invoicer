@@ -16,6 +16,7 @@ from ms_invoicer.file_helpers import (
 )
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
+from ms_invoicer.utils import get_current_date
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -77,25 +78,6 @@ def delete_file(
     return crud.delete_file(db=db, model_id=model_id, current_user_id=current_user.id)
 
 
-@router.post("/upload_file", response_model=schemas.File)
-async def create_upload_file(
-    invoice_id: str = Form(),
-    bill_to_id: str = Form(),
-    file: UploadFile = Form(),
-    current_user: schemas.User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    file_created = await process_file(
-        file=file,
-        invoice_id=int(invoice_id),
-        bill_to_id=int(bill_to_id),
-        current_user_id=current_user.id,
-    )
-    return crud.get_file(
-        db=db, model_id=file_created.id, current_user_id=current_user.id
-    )
-
-
 class SummaryRequest(BaseModel):
     customer_id: str
     start_date: str
@@ -129,8 +111,7 @@ async def generate_summary(
 @router.post("/get_pages", response_model=Dict[str, List[str]])
 async def get_pages(
     file: UploadFile = Form(),
-    current_user: schemas.User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user)
 ):
     response = extract_pages(file=file, current_user_id=current_user.id)
     return {"pages": response}
@@ -167,7 +148,10 @@ async def generate_pdf(
 
     try:
         if invoice:
-            invoice_schema = schemas.InvoiceBase(**json.loads(invoice))
+            invoice_json = json.loads(invoice)
+            invoice_json["created"] = get_current_date()
+            invoice_json["updated"] = get_current_date()
+            invoice_schema = schemas.InvoiceBase(**invoice_json)
             if with_taxes is not None:
                 invoice_schema.with_taxes = with_taxes
             invoice: schemas.InvoiceBase = invoice_schema
@@ -175,9 +159,14 @@ async def generate_pdf(
             schemas.ServiceCreateNoFile(**contract)
             for contract in json.loads(contracts)
         ]
-        pages: List[str] = [page for page in json.loads(pages)]
+        pages_json: List[str] = json.loads(pages)
+        pages_formatted: List[str] = []
+        for page in pages_json:
+            if "," in page:
+                pages_formatted.append(page.replace(",", "-"))
+
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON data provided")
+        raise HTTPException(status_code=400, detail="JSON Invalido")
 
     if invoice:
         result = crud.get_invoices_by_number_id(
@@ -207,7 +196,7 @@ async def generate_pdf(
                         model_id=new_invoice.id,
                         current_user_id=current_user.id,
                         update_dict={"with_taxes": with_taxes},
-                    )  # TODO: Manejar evento cuando falla la actualización
+                    )
                     new_invoice.with_taxes = with_taxes
             else:
                 obj_dict = invoice.dict()
@@ -222,7 +211,7 @@ async def generate_pdf(
                 invoice_id=int(new_invoice.id),
                 bill_to_id=int(bill_to_id),
                 current_user_id=current_user.id,
-                pages=pages,
+                pages=pages_formatted,
             )
 
             return await process_pdf(
@@ -233,7 +222,7 @@ async def generate_pdf(
                 current_user=current_user,
                 new_file_obj=file_created,
                 xlsx_local_path=xlsx_local_path,
-                pages=pages,
+                pages=pages_formatted,
             )
         except Exception as e:
             log.error("Customer {} - {}".format(current_user.id, e))

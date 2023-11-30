@@ -2,6 +2,7 @@ from typing import Optional, Union
 import logging
 import os
 import boto3
+import pytz
 
 from typing import List
 from fastapi import UploadFile
@@ -39,26 +40,13 @@ def check_dates(base_date: datetime, date1: time, date2: time = None) -> datetim
 
 
 def create_folders():
-    folder_name = "temp"
-    if not os.path.exists(folder_name):
-        log.info("Creating folder {} ...".format(folder_name))
-        os.mkdir(folder_name)
-    else:
-        log.info("Folder does exist")
-
-    folder_name = "temp/xlsx"
-    if not os.path.exists(folder_name):
-        log.info("Creating folder {} ...".format(folder_name))
-        os.mkdir(folder_name)
-    else:
-        log.info("Folder does exist")
-
-    folder_name = "temp/pdf"
-    if not os.path.exists(folder_name):
-        log.info("Creating folder {} ...".format(folder_name))
-        os.mkdir(folder_name)
-    else:
-        log.info("Folder does exist")
+    folder_names = ["temp", "temp/xlsx", "temp/pdf"]
+    for folder_name in folder_names:
+        if not os.path.exists(folder_name):
+            log.info("Creating folder {} ...".format(folder_name))
+            os.mkdir(folder_name)
+        else:
+            log.info("Folder {} does exist".format(folder_name))
 
 
 def save_file(file_path: str, file: UploadFile):
@@ -224,3 +212,11 @@ def extract_and_get_month_name(date: datetime) -> Optional[str]:
     if month in MONTH_NAMES_FRENCH:
         return MONTH_NAMES_FRENCH[month]
     return None
+
+
+def get_current_date() -> datetime:
+    # Create a timezone object for Eastern Standard Time
+    est = pytz.timezone('US/Eastern')
+    # Get the current time in UTC and convert it to EST
+    current_time_in_est = datetime.now(pytz.utc).astimezone(est)
+    return current_time_in_est

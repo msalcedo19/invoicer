@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
+from ms_invoicer.utils import get_current_date
 
 router = APIRouter()
 
@@ -36,7 +37,7 @@ def update_global(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    model["updated"] = datetime.now()
+    model["updated"] = get_current_date()
     global_var = crud.get_global_by_id(
         db=db, model_id=model_id, current_user_id=current_user.id
     )

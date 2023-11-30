@@ -46,7 +46,9 @@ async def build_pdf(event: PdfToProcessEvent):
             db=connection, current_user_id=event.current_user_id, model_id=event.file.id
         )
         event.invoice = crud.get_invoice(
-            db=connection, current_user_id=event.current_user_id, model_id=event.invoice.id
+            db=connection,
+            current_user_id=event.current_user_id,
+            model_id=event.invoice.id,
         )
         with open(input_html_path) as fp:
             soup = BeautifulSoup(fp, "html.parser")
@@ -164,7 +166,11 @@ async def build_pdf(event: PdfToProcessEvent):
             output_text = template.render(context)
 
             if not service_info:
-                searched_file = crud.get_file(db=connection, model_id=event.file.id, current_user_id=event.current_user_id)
+                searched_file = crud.get_file(
+                    db=connection,
+                    model_id=event.file.id,
+                    current_user_id=event.current_user_id,
+                )
                 if searched_file and len(searched_file.services) > 0:
                     service_info = searched_file.services[0]
             filename = f"facture_{event.invoice.number_id}_{service_info.title}_{event.invoice.created.strftime('%m_%Y')}-{str(uuid4())}.pdf"
@@ -200,11 +206,8 @@ async def build_pdf(event: PdfToProcessEvent):
             await publish(data_event)
             return True
     except Exception as e:
-        log.error(
-            "Customer {} - Failure building pdf - err: {}".format(
-                event.current_user_id, e
-            )
-        )
+        log.error("Customer {} - Failure building pdf".format(event.current_user_id))
+        log.error(e)
         raise
 
 
@@ -313,10 +316,9 @@ def generate_invoice(event: GenerateFinalPDFWithFile):
         return True
     except Exception as e:
         log.error(
-            "Customer {} - Failure generating invoice - err: {}".format(
-                event.current_user_id, e
-            )
+            "Customer {} - Failure generating invoice".format(event.current_user_id)
         )
+        log.error(e)
         raise
 
 
@@ -353,8 +355,7 @@ def generate_invoice_no_file(event: GenerateFinalPDFNoFile):
         return True
     except Exception as e:
         log.error(
-            "Customer {} - Failure generating invoice - err: {}".format(
-                event.current_user_id, e
-            )
+            "Customer {} - Failure generating invoice".format(event.current_user_id)
         )
+        log.error(e)
         raise
