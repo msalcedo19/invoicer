@@ -17,6 +17,16 @@ else
     exit 1
 fi
 
+source venv/bin/activate
+pip install -r ./requirements/production.txt
+
+if [ $? -eq 0 ]; then
+    echo "Successfully installed all dependencies."
+else
+    echo "Failed to install dependencies"
+    exit 1
+fi
+
 cp ../alembic.ini .
 cp ../config.py ms_invoicer/
 
@@ -29,6 +39,8 @@ else
     echo "Failed to run database migration. Check your migration scripts and database configuration."
     exit 1
 fi
+
+export ENV_FOR_DYNACONF=production 
 
 # Restart the necessary services or processes
 echo "Restarting services..."

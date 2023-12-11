@@ -113,7 +113,7 @@ async def get_pages(
     file: UploadFile = Form(),
     current_user: schemas.User = Depends(get_current_user)
 ):
-    response = extract_pages(file=file, current_user_id=current_user.id)
+    response = extract_pages(uploaded_file=file, current_user_id=current_user.id)
     return {"pages": response}
 
 
@@ -137,6 +137,7 @@ async def generate_pdf(
     invoice_customer_id: str = Form(None),
     bill_to_id: str = Form(),
     with_taxes: bool = Form(None),
+    with_tables: bool = Form(None),
     invoice: Optional[str] = Form(None),
     contracts: str = Form(),
     pages: str = Form(),
@@ -154,16 +155,21 @@ async def generate_pdf(
             invoice_schema = schemas.InvoiceBase(**invoice_json)
             if with_taxes is not None:
                 invoice_schema.with_taxes = with_taxes
+            if with_tables is not None:
+                invoice_schema.with_tables = with_tables
             invoice: schemas.InvoiceBase = invoice_schema
         contracts: List[schemas.ServiceCreateNoFile] = [
             schemas.ServiceCreateNoFile(**contract)
             for contract in json.loads(contracts)
         ]
+
         pages_json: List[str] = json.loads(pages)
         pages_formatted: List[str] = []
         for page in pages_json:
             if "," in page:
                 pages_formatted.append(page.replace(",", "-"))
+            else:
+                pages_formatted.append(page)
 
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="JSON Invalido")
@@ -190,14 +196,15 @@ async def generate_pdf(
                     customer_id=invoice_customer_id,
                     current_user_id=current_user.id,
                 )
-                if with_taxes is not None:
+                if with_taxes is not None and with_tables is not None:
                     crud.patch_invoice(
                         db=db,
                         model_id=new_invoice.id,
                         current_user_id=current_user.id,
-                        update_dict={"with_taxes": with_taxes},
+                        update_dict={"with_taxes": with_taxes, "with_tables": with_tables},
                     )
                     new_invoice.with_taxes = with_taxes
+                    new_invoice.with_tables = with_tables
             else:
                 obj_dict = invoice.dict()
                 obj_dict["user_id"] = current_user.id

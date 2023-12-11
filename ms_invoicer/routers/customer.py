@@ -1,6 +1,6 @@
-from typing import Union
+from typing import List, Union, Dict
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from ms_invoicer.config import S3_BUCKET_NAME
 
@@ -12,25 +12,51 @@ from ms_invoicer.utils import delete_file_from_s3
 router = APIRouter()
 
 
-@router.get("/customer", response_model=list[schemas.Customer])
+@router.get("/customer", response_model=schemas.TotalAndCustomer)
 async def get_customers(
     current_user: schemas.User = Depends(get_current_user),
-    skip: int = 0,
-    limit: int = 100,
     db: Session = Depends(get_db),
 ):
-    return crud.get_customers(
-        db=db, current_user_id=current_user.id, skip=skip, limit=limit
+    start = 0
+    return schemas.TotalAndCustomer(
+        **{
+            "total": crud.get_total_customers(db=db, current_user_id=current_user.id),
+            "customers": crud.get_customers(
+                db=db, current_user_id=current_user.id, skip=start
+            ),
+        }
     )
 
 
-@router.get("/customer/{model_id}", response_model=Union[schemas.Customer, None])
+@router.get("/customer/{model_id}", response_model=Union[schemas.CustomerFull, None])
 def get_customer(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     return crud.get_customer(db=db, model_id=model_id, current_user_id=current_user.id)
+
+
+@router.get("/customer/{model_id}/invoices", response_model=schemas.TotalAndInvoices)
+def get_customer_invoices(
+    model_id: int,
+    current_user: schemas.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    start = 0
+    return schemas.TotalAndInvoices(
+        **{
+            "total": crud.get_total_invoices_by_customer(
+                db=db, model_id=model_id, current_user_id=current_user.id
+            ),
+            "invoices": crud.get_invoices_by_customer(
+                db=db,
+                model_id=model_id,
+                current_user_id=current_user.id,
+                skip=start,
+            ),
+        }
+    )
 
 
 @router.patch("/customer/{model_id}", response_model=Union[schemas.Customer, None])
@@ -90,7 +116,7 @@ def delete_customer(
     )
 
 
-@router.post("/customer", response_model=schemas.CustomerLite)
+@router.post("/customer", response_model=schemas.Customer)
 def post_customer(
     customer: schemas.CustomerBase,
     current_user: schemas.User = Depends(get_current_user),
@@ -108,9 +134,7 @@ async def get_all_customers(
     limit: int = 100,
     db: Session = Depends(get_db),
 ):
-    return crud.get_all_customers(
-        db=db, skip=skip, limit=limit
-    )
+    return crud.get_all_customers(db=db, skip=skip, limit=limit)
 
 
 @router.patch("/update_customer_data")
@@ -120,9 +144,7 @@ def patch_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    model_update = {
-        "user_id": new_user_id
-    }
+    model_update = {"user_id": new_user_id}
 
     result = crud.patch_all_customer_by_user_id(
         db=db,

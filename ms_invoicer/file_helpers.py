@@ -89,7 +89,7 @@ async def process_file(
             **{
                 "s3_xlsx_url": s3_url,
                 "s3_pdf_url": None,
-                "created": date_now.date(),
+                "created": date_now,
                 "pages_xlsx": ",".join(pages),
                 "invoice_id": invoice_id,
                 "bill_to_id": bill_to_id,
@@ -193,7 +193,6 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                     price_unit = round(amount / hours, 2)
                 else:
                     amount = hours * float(price_unit)
-
                 contract_dict["hours"] = hours
                 contract_dict["currency"] = currency
                 contract_dict["amount"] = amount
@@ -241,7 +240,7 @@ async def process_pdf(
             **{
                 "s3_xlsx_url": None,
                 "s3_pdf_url": None,
-                "created": current_date.date(),
+                "created": current_date,
                 "pages_xlsx": ",".join(pages),
                 "invoice_id": invoice.id,
                 "bill_to_id": bill_to_id,

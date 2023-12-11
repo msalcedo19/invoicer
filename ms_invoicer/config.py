@@ -1,23 +1,21 @@
-import os
+from config import settings
 
-LOG_LEVEL = os.environ.get("LOG_LEVEL", "DEBUG")
+LOG_LEVEL = settings.LOG_LEVEL
 
 # Database
-URL_CONNECTION = os.environ.get(
-    "URL_CONNECTION", "postgresql://postgres:postgres@localhost/invoicer"
-)
+URL_CONNECTION = settings.URL_CONNECTION
 
 # S3
-S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "")
-S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", "")
-S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "invoicer-dev-01")
+S3_ACCESS_KEY = settings.S3_ACCESS_KEY
+S3_SECRET_ACCESS_KEY = settings.S3_SECRET_ACCESS_KEY
+S3_BUCKET_NAME = settings.S3_BUCKET_NAME
 
 # PDF
-WKHTMLTOPDF_PATH = os.environ.get("WKHTMLTOPDF_PATH", "/usr/local/bin/wkhtmltopdf")
+WKHTMLTOPDF_PATH = settings.WKHTMLTOPDF_PATH
 
 # Security
 # to get a string like this run:
 # openssl rand -hex 32
-SECRET_KEY = os.environ.get("SECRET_KEY", "")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES

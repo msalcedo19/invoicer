@@ -170,14 +170,6 @@ class CustomerCreate(CustomerBase):
     user_id: int
 
 
-class CustomerLite(CustomerBase):
-    id: int
-    num_invoices: int
-
-    class Config:
-        orm_mode = True
-
-
 # INVOICE -------------------------------------------------------------
 class InvoiceBase(BaseModel):
     number_id: int
@@ -185,6 +177,7 @@ class InvoiceBase(BaseModel):
     tax_1: Optional[float]
     tax_2: Optional[float]
     with_taxes: Optional[bool]
+    with_tables: Optional[bool]
     created: datetime
     updated: datetime
     customer_id: int
@@ -211,6 +204,13 @@ class File(FileBase):
         orm_mode = True
 
 
+class FileLite(FileBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 # INVOICE -------------------------------------------------------------
 class Invoice(InvoiceBase):
     id: int
@@ -224,7 +224,24 @@ class Invoice(InvoiceBase):
 class Customer(CustomerBase):
     id: int
     num_invoices: int
-    invoices: List[Invoice] = []
 
     class Config:
         orm_mode = True
+
+
+class CustomerFull(CustomerBase):
+    id: int
+    invoices: List[Invoice]
+
+    class Config:
+        orm_mode = True
+
+# TOTALS
+class TotalAndCustomer(BaseModel):
+    total: int
+    customers: List[Customer]
+
+
+class TotalAndInvoices(BaseModel):
+    total: int
+    invoices: List[Invoice]

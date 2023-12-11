@@ -69,3 +69,6 @@ temp/
 no_upload_helper.py
 no_upload_helper_copy.py
 *.sql
+
+# Ignore dynaconf secret files
+.secrets.*

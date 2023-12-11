@@ -1,0 +1,29 @@
+[default]
+LOG_LEVEL = "DEBUG"
+# S3
+S3_BUCKET_NAME = ""
+# PDF
+WKHTMLTOPDF_PATH = "/usr/local/bin/wkhtmltopdf"
+# Security
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440
+
+[development]
+LOG_LEVEL = "DEBUG"
+# S3
+S3_BUCKET_NAME = "invoicer-dev-01"
+# PDF
+WKHTMLTOPDF_PATH = "/usr/local/bin/wkhtmltopdf"
+# Security
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440
+
+[production]
+LOG_LEVEL = "INFO"
+# S3
+S3_BUCKET_NAME = "invoicer-files-dev"
+# PDF
+WKHTMLTOPDF_PATH = "/usr/bin/wkhtmltopdf"
+# Security
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440

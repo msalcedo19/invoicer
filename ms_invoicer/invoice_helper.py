@@ -100,6 +100,7 @@ async def build_pdf(event: PdfToProcessEvent):
             subtotal = 0
             index = 0
             service_info = None
+            # Contratos enviados sin archivo
             for service in event.file.services:
                 if not service_info:
                     service_info = service
@@ -189,6 +190,7 @@ async def build_pdf(event: PdfToProcessEvent):
                     pdf_invoice=output_pdf_path,
                     filename=filename,
                     file_id=event.file.id,
+                    with_tables=event.invoice.with_tables,
                     pages=event.pages,
                 )
             else:
@@ -218,74 +220,77 @@ def generate_invoice(event: GenerateFinalPDFWithFile):
         )
     )
     try:
-        # Define the page size
-        page_size = letter
+        paths_to_check = [event.path_pdf_invoice]
+        if event.with_tables:
+            paths_to_check.append(event.path_pdf_tables)
+            # Define the page size
+            page_size = letter
 
-        # Define the table style
-        table_style = TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#333333")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#ffffff")),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 12),
-                ("LEADING", (0, 0), (-1, -1), 12),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
-                ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f2f2f2")),
-                ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#333333")),
-                ("GRID", (0, 0), (-1, 0), 2, colors.HexColor("#333333")),
-                ("GRID", (0, 1), (-1, -1), 1, colors.HexColor("#333333")),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ]
-        )
+            # Define the table style
+            table_style = TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#333333")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#ffffff")),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 12),
+                    ("LEADING", (0, 0), (-1, -1), 12),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f2f2f2")),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#333333")),
+                    ("GRID", (0, 0), (-1, 0), 2, colors.HexColor("#333333")),
+                    ("GRID", (0, 1), (-1, -1), 1, colors.HexColor("#333333")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
 
-        # Create the PDF document
-        doc = SimpleDocTemplate(event.path_pdf_tables, pagesize=page_size)
-        elements = []
+            # Create the PDF document
+            doc = SimpleDocTemplate(event.path_pdf_tables, pagesize=page_size)
+            elements = []
 
-        # Load the Excel workbook
-        wb = load_workbook(filename=event.xlsx_url, data_only=True)
+            # Load the Excel workbook
+            wb = load_workbook(filename=event.xlsx_url, data_only=True)
 
-        # Select the worksheet with the table
-        for sheet_name in wb.sheetnames:
-            if sheet_name not in event.pages:
-                continue
-            ws = wb[sheet_name]
+            # Select the worksheet with the table
+            for sheet_name in wb.sheetnames:
+                if sheet_name not in event.pages:
+                    continue
+                ws = wb[sheet_name]
 
-            ranges = find_ranges(ws)
-            for range_of in ranges:
-                (_, _, minrow, maxrow) = range_of
+                ranges = find_ranges(ws)
+                for range_of in ranges:
+                    (_, _, minrow, maxrow) = range_of
 
-                # -1 because the headers
-                # Extract the table data as a list of rows
-                table_data = []
-                for row in ws.iter_rows(
-                    min_row=minrow - 1, max_row=maxrow, max_col=6, values_only=True
-                ):
-                    row_data = []
-                    for cell in row:
-                        if isinstance(cell, datetime):
-                            cell_value = cell.strftime("%Y-%m-%d")
-                        elif isinstance(cell, float):
-                            cell_value = round(cell, 2)
-                        else:
-                            cell_value = cell
-                        row_data.append(cell_value)
-                    table_data.append(row_data)
+                    # -1 because the headers
+                    # Extract the table data as a list of rows
+                    table_data = []
+                    for row in ws.iter_rows(
+                        min_row=minrow - 1, max_row=maxrow, max_col=6, values_only=True
+                    ):
+                        row_data = []
+                        for cell in row:
+                            if isinstance(cell, datetime):
+                                cell_value = cell.strftime("%Y-%m-%d")
+                            elif isinstance(cell, float):
+                                cell_value = round(cell, 2)
+                            else:
+                                cell_value = cell
+                            row_data.append(cell_value)
+                        table_data.append(row_data)
 
-                # Add the table to the PDF document
-                table = Table(table_data)
-                table.setStyle(table_style)
-                elements.append(table)
+                    # Add the table to the PDF document
+                    table = Table(table_data)
+                    table.setStyle(table_style)
+                    elements.append(table)
 
-                # Add a page break after the table
-                elements.append(PageBreak())
+                    # Add a page break after the table
+                    elements.append(PageBreak())
 
-        # Build and save the PDF document
-        doc.build(elements)
+            # Build and save the PDF document
+            doc.build(elements)
 
         merger = PdfMerger()
-        for pdf in [event.path_pdf_invoice, event.path_pdf_tables]:
+        for pdf in paths_to_check:
             merger.append(pdf)
         merger.write(event.path_pdf_invoice)
         merger.close()

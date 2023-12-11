@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Double, ForeignKey, Integer, String, Boolean
+from sqlalchemy import Column, DateTime, Double, ForeignKey, Integer, String, Boolean, select, func
 from sqlalchemy.orm import relationship
 
 from ms_invoicer.sql_app.database import Base
@@ -11,11 +11,7 @@ class Customer(Base):
     name = Column(String, index=True)
     user_id = Column(Integer, ForeignKey("invoicer_user.id"), index=True)
 
-    invoices = relationship("Invoice")
-
-    @property
-    def num_invoices(self):
-        return len(self.invoices)
+    invoices = relationship("Invoice", back_populates="customer")
 
 
 class Invoice(Base):
@@ -29,6 +25,7 @@ class Invoice(Base):
     created = Column(DateTime)
     updated = Column(DateTime)
     with_taxes = Column(Boolean)
+    with_tables = Column(Boolean)
     customer_id = Column(Integer, ForeignKey("customers.id"))
     user_id = Column(Integer, ForeignKey("invoicer_user.id"), index=True)
 

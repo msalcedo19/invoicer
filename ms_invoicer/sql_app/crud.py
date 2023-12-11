@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List
 
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 
 from ms_invoicer.sql_app import models, schemas
 
@@ -10,7 +10,9 @@ from ms_invoicer.sql_app import models, schemas
 # Template ----------------------------------------------------------
 def get_templates(db: Session, current_user_id: int):
     return (
-        db.query(models.Template).filter(models.Template.user_id == current_user_id).all()
+        db.query(models.Template)
+        .filter(models.Template.user_id == current_user_id)
+        .all()
     )
 
 
@@ -119,26 +121,50 @@ def get_customer(db: Session, model_id: int, current_user_id: int):
 
 
 def get_customers(
-    db: Session, current_user_id: int, skip: int = 0, limit: int = 100
+    db: Session, current_user_id: int, skip: int = 0, limit: int = 1000
 ) -> List[models.Customer]:
-    return (
-        db.query(models.Customer)
+    # Define the subquery for counting invoices
+    invoice_count_subquery = (
+        db.query(
+            models.Invoice.customer_id,
+            func.count(models.Invoice.id).label("num_invoices"),
+        )
+        .group_by(models.Invoice.customer_id)
+        .subquery()
+    )
+
+    query_results = (
+        db.query(
+            models.Customer.id,
+            models.Customer.name,
+            func.coalesce(invoice_count_subquery.c.num_invoices, 0).label(
+                "num_invoices"
+            ),
+        )
+        .outerjoin(
+            invoice_count_subquery,
+            models.Customer.id == invoice_count_subquery.c.customer_id,
+        )
         .filter(models.Customer.user_id == current_user_id)
         .offset(skip)
         .limit(limit)
         .all()
+    )
+    return query_results
+
+
+def get_total_customers(db: Session, current_user_id: int) -> int:
+    return (
+        db.query(func.count(models.Customer.id))
+        .filter(models.Customer.user_id == current_user_id)
+        .scalar()
     )
 
 
 def get_all_customers(
     db: Session, skip: int = 0, limit: int = 100
 ) -> List[models.Customer]:
-    return (
-        db.query(models.Customer)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    return db.query(models.Customer).offset(skip).limit(limit).all()
 
 
 def patch_customer(db: Session, model_id: int, current_user_id: int, update_dict: dict):
@@ -156,9 +182,7 @@ def patch_customer(db: Session, model_id: int, current_user_id: int, update_dict
 def patch_all_customer_by_user_id(db: Session, user_id: int, update_dict: dict):
     result = (
         db.query(models.Customer)
-        .filter(
-            models.Customer.user_id == user_id
-        )
+        .filter(models.Customer.user_id == user_id)
         .update(update_dict)
     )
     db.commit()
@@ -225,12 +249,12 @@ def patch_file(db: Session, model_id: int, current_user_id: int, update_dict: di
     return result
 
 
-def patch_all_files_by_invoice_user_id(db: Session, user_id: int, invoice_id: int, update_dict: dict):
+def patch_all_files_by_invoice_user_id(
+    db: Session, user_id: int, invoice_id: int, update_dict: dict
+):
     result = (
         db.query(models.File)
-        .filter(
-            models.File.user_id == user_id, models.File.invoice_id == invoice_id
-        )
+        .filter(models.File.user_id == user_id, models.File.invoice_id == invoice_id)
         .update(update_dict)
     )
     db.commit()
@@ -285,12 +309,7 @@ def get_billtos(db: Session, current_user_id: int, skip: int = 0, limit: int = 1
 
 
 def get_billtos_no_user(db: Session, skip: int = 0, limit: int = 100):
-    return (
-        db.query(models.BillTo)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    return db.query(models.BillTo).offset(skip).limit(limit).all()
 
 
 def patch_billto(db: Session, model_id: int, current_user_id: int, update_dict: dict):
@@ -393,18 +412,38 @@ def get_invoice(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def get_invoices_by_customer(db: Session, model_id: int, current_user_id: int):
+def get_invoices_by_customer(db: Session, model_id: int, current_user_id: int, skip: int, limit: int = 1000):
     return (
         db.query(models.Invoice)
         .filter(
             models.Invoice.customer_id == model_id,
             models.Invoice.user_id == current_user_id,
         )
+        .order_by(desc(models.Invoice.number_id))
+        .offset(skip)
+        .limit(limit)
         .all()
     )
 
 
-def get_invoices_by_customer_and_date_range(db: Session, model_id: int, current_user_id: int, start_date: datetime, end_date: datetime):
+def get_total_invoices_by_customer(db: Session, model_id: int, current_user_id: int) -> int:
+    return (
+        db.query(func.count(models.Invoice.id))
+        .filter(
+            models.Invoice.customer_id == model_id,
+            models.Invoice.user_id == current_user_id,
+        )
+        .scalar()
+    )
+
+
+def get_invoices_by_customer_and_date_range(
+    db: Session,
+    model_id: int,
+    current_user_id: int,
+    start_date: datetime,
+    end_date: datetime,
+):
     return (
         db.query(models.Invoice)
         .filter(
@@ -433,6 +472,7 @@ def get_invoices_by_number_id(
 def get_invoices(db: Session, current_user_id: int, skip: int = 0, limit: int = 100):
     return (
         db.query(models.Invoice)
+        .order_by(desc(models.Invoice.number_id))
         .filter(models.Invoice.user_id == current_user_id)
         .offset(skip)
         .limit(limit)
@@ -452,7 +492,9 @@ def patch_invoice(db: Session, model_id: int, current_user_id: int, update_dict:
     return result
 
 
-def patch_all_invoice_by_customer_user_id(db: Session, customer_id: int, user_id: int, update_dict: dict):
+def patch_all_invoice_by_customer_user_id(
+    db: Session, customer_id: int, user_id: int, update_dict: dict
+):
     result = (
         db.query(models.Invoice)
         .filter(

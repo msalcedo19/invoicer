@@ -74,12 +74,14 @@ class GenerateFinalPDFWithFile(GenerateFinalPDF):
         pdf_invoice: str,
         filename: str,
         file_id: int,
+        with_tables: bool = True,
         pages: List[str] = []
     ):
         super().__init__(current_user_id=current_user_id, filename=filename, file_id=file_id)
         self.path_pdf_tables = pdf_tables
         self.xlsx_url = xlsx_url
         self.path_pdf_invoice = pdf_invoice
+        self.with_tables = with_tables
         self.pages = pages
 
 

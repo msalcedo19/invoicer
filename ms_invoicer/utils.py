@@ -1,3 +1,4 @@
+import json
 from typing import Optional, Union
 import logging
 import os
@@ -31,6 +32,16 @@ MONTH_NAMES_FRENCH = {
 }
 
 
+class BreadCrumbs:
+    def __init__(self, href: str, value: str, required_id: int = None):
+        self.href = href
+        self.value = value
+        self.required_id = required_id
+    
+    def __repr__(self):
+        return json.dumps({"href": self.href, "value": self.value, "required_id": self.required_id})
+
+
 def check_dates(base_date: datetime, date1: time, date2: time = None) -> datetime:
     """ """
     result = datetime.combine(base_date, date1)
@@ -40,7 +51,7 @@ def check_dates(base_date: datetime, date1: time, date2: time = None) -> datetim
 
 
 def create_folders():
-    folder_names = ["temp", "temp/xlsx", "temp/pdf"]
+    folder_names = ["temp", "temp/xlsx", "temp/pdf", "temp/cache"]
     for folder_name in folder_names:
         if not os.path.exists(folder_name):
             log.info("Creating folder {} ...".format(folder_name))

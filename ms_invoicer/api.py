@@ -1,14 +1,15 @@
 import logging
+import time
 from typing import List
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from ms_invoicer.config import LOG_LEVEL
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.event_handler import register_event_handlers
-from ms_invoicer.routers import bill_to, customer, files, invoice, user, globals
+from ms_invoicer.routers import bill_to, customer, files, invoice, user, globals, utils
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import create_folders
@@ -31,6 +32,7 @@ api.include_router(files.router, tags=["File"])
 api.include_router(bill_to.router, tags=["Bill_to"])
 api.include_router(globals.router, tags=["Globals"])
 api.include_router(user.router, tags=["User"])
+api.include_router(utils.router, tags=["Utils"])
 
 logging.basicConfig(
     format="[%(asctime)s] %(levelname)-8s - %(message)s", level=LOG_LEVEL
@@ -39,95 +41,20 @@ log = logging.getLogger(__name__)
 register_event_handlers()
 
 
+@api.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    log.info(f"Request: {request.url} completed in {process_time} seconds")
+    return response
+
+
 @api.get("/")
 def api_status():
     """Returns a detailed status of the service including all dependencies"""
     # TODO: Should replace this with database connection / service checks
     return {"status": "OK"}
-
-
-@api.post("/breadcrumbs")
-def build_breadcrumbs(
-    data: dict,
-    current_user: schemas.User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    current_path = data.get("current_path", None)
-    result = {
-        "options": [
-            {
-                "value": "Clientes",
-                "href": "/customer",
-                "active": True,
-            },
-        ]
-    }
-    if current_path:
-        parts = current_path.split("/")[1:]
-        if len(parts) == 1:
-            return result
-        elif len(parts) == 2:
-            for option in result["options"]:
-                option["active"] = False
-            if parts[0] == "customer":
-                customer = crud.get_customer(
-                    db=db, model_id=parts[1], current_user_id=current_user.id
-                )
-                next_option = {
-                    "value": customer.name,
-                    "href": "/customer/{}".format(customer.id),
-                    "active": True,
-                }
-                result["options"].append(next_option)
-            elif parts[0] == "files":
-                file = crud.get_file(
-                    db=db, model_id=parts[1], current_user_id=current_user.id
-                )
-                invoice = crud.get_invoice(
-                    db=db, model_id=file.invoice_id, current_user_id=current_user.id
-                )
-                customer = crud.get_customer(
-                    db=db, model_id=invoice.customer_id, current_user_id=current_user.id
-                )
-                next_option = {
-                    "value": customer.name,
-                    "href": "/customer/{}".format(customer.id),
-                    "active": False,
-                }
-                result["options"].append(next_option)
-                next_option = {
-                    "value": "Factura {}".format(invoice.number_id),
-                    "href": "/invoice/{}".format(invoice.id),
-                    "active": False,
-                }
-                result["options"].append(next_option)
-                next_option = {
-                    "value": "Contratos",
-                    "href": "/files/{}".format(file.id),
-                    "active": True,
-                }
-                result["options"].append(next_option)
-            elif parts[0] == "invoice":
-                invoice = crud.get_invoice(
-                    db=db, model_id=parts[1], current_user_id=current_user.id
-                )
-                customer = crud.get_customer(
-                    db=db, model_id=invoice.customer_id, current_user_id=current_user.id
-                )
-                next_option = {
-                    "value": customer.name,
-                    "href": "/customer/{}".format(customer.id),
-                    "active": False,
-                }
-                result["options"].append(next_option)
-                next_option = {
-                    "value": "Factura {}".format(invoice.number_id),
-                    "href": "/invoice/{}".format(invoice.id),
-                    "active": True,
-                }
-                result["options"].append(next_option)
-            return result
-    return result
 
 
 @api.get("/service", response_model=List[schemas.Service])
