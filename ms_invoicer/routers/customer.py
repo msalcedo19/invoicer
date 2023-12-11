@@ -19,12 +19,10 @@ async def get_customers(
 ):
     start = 0
     return schemas.TotalAndCustomer(
-        **{
-            "total": crud.get_total_customers(db=db, current_user_id=current_user.id),
-            "customers": crud.get_customers(
-                db=db, current_user_id=current_user.id, skip=start
-            ),
-        }
+        total=crud.get_total_customers(db=db, current_user_id=current_user.id),
+        customers=crud.get_customers(
+            db=db, current_user_id=current_user.id, skip=start
+        ),
     )
 
 
@@ -45,17 +43,15 @@ def get_customer_invoices(
 ):
     start = 0
     return schemas.TotalAndInvoices(
-        **{
-            "total": crud.get_total_invoices_by_customer(
-                db=db, model_id=model_id, current_user_id=current_user.id
-            ),
-            "invoices": crud.get_invoices_by_customer(
-                db=db,
-                model_id=model_id,
-                current_user_id=current_user.id,
-                skip=start,
-            ),
-        }
+        total=crud.get_total_invoices_by_customer(
+            db=db, model_id=model_id, current_user_id=current_user.id
+        ),
+        invoices=crud.get_invoices_by_customer(
+            db=db,
+            model_id=model_id,
+            current_user_id=current_user.id,
+            skip=start,
+        ),
     )
 
 

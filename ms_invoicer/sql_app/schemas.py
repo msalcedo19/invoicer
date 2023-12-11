@@ -40,7 +40,7 @@ class User(BaseModel):
     username: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # Template -------------------------------------------------------------
@@ -58,7 +58,7 @@ class Template(TemplateBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # Global -------------------------------------------------------------
@@ -78,7 +78,7 @@ class Global(GlobalBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # SERVICE -------------------------------------------------------------
@@ -106,7 +106,7 @@ class Service(ServiceBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # BILLTO -------------------------------------------------------------
@@ -125,7 +125,7 @@ class BillTo(BillToBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # TOPINFO -------------------------------------------------------------
@@ -144,7 +144,7 @@ class TopInfo(TopInfoBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # FILE -------------------------------------------------------------
@@ -191,7 +191,7 @@ class InvoiceLite(InvoiceBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # FILE -------------------------------------------------------------
@@ -201,14 +201,14 @@ class File(FileBase):
     services: list[Service] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class FileLite(FileBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # INVOICE -------------------------------------------------------------
@@ -217,7 +217,7 @@ class Invoice(InvoiceBase):
     files: List[File] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # CUSTOMER -------------------------------------------------------------
@@ -226,7 +226,7 @@ class Customer(CustomerBase):
     num_invoices: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CustomerFull(CustomerBase):
@@ -234,7 +234,7 @@ class CustomerFull(CustomerBase):
     invoices: List[Invoice]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # TOTALS
 class TotalAndCustomer(BaseModel):

@@ -150,7 +150,11 @@ def get_customers(
         .limit(limit)
         .all()
     )
-    return query_results
+    # Transform query results into a list of dictionaries
+    return [
+        {"id": id, "name": name, "num_invoices": num_invoices}
+        for id, name, num_invoices in query_results
+    ]
 
 
 def get_total_customers(db: Session, current_user_id: int) -> int:
@@ -412,8 +416,10 @@ def get_invoice(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def get_invoices_by_customer(db: Session, model_id: int, current_user_id: int, skip: int, limit: int = 1000):
-    return (
+def get_invoices_by_customer(
+    db: Session, model_id: int, current_user_id: int, skip: int, limit: int = 1000
+):
+    query_results = (
         db.query(models.Invoice)
         .filter(
             models.Invoice.customer_id == model_id,
@@ -425,8 +431,12 @@ def get_invoices_by_customer(db: Session, model_id: int, current_user_id: int, s
         .all()
     )
 
+    return query_results
 
-def get_total_invoices_by_customer(db: Session, model_id: int, current_user_id: int) -> int:
+
+def get_total_invoices_by_customer(
+    db: Session, model_id: int, current_user_id: int
+) -> int:
     return (
         db.query(func.count(models.Invoice.id))
         .filter(

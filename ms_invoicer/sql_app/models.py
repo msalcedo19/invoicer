@@ -30,7 +30,7 @@ class Invoice(Base):
     user_id = Column(Integer, ForeignKey("invoicer_user.id"), index=True)
 
     customer = relationship("Customer", back_populates="invoices", uselist=False)
-    files = relationship("File")
+    files = relationship("File", back_populates="invoice")
 
 
 class BillTo(Base):
@@ -83,6 +83,7 @@ class File(Base):
 
     bill_to = relationship("BillTo", uselist=False)
     services = relationship("Service")
+    invoice = relationship("Invoice")
 
 
 class Globals(Base):

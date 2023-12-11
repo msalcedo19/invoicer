@@ -28,7 +28,6 @@ else
 fi
 
 cp ../alembic.ini .
-cp ../config.py ms_invoicer/
 
 alembic upgrade head
 
@@ -39,8 +38,6 @@ else
     echo "Failed to run database migration. Check your migration scripts and database configuration."
     exit 1
 fi
-
-export ENV_FOR_DYNACONF=production 
 
 # Restart the necessary services or processes
 echo "Restarting services..."
