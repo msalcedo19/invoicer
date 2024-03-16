@@ -24,6 +24,7 @@ from ms_invoicer.sql_app.models import Invoice, User
 from ms_invoicer.utils import (
     download_file_from_s3,
     extract_and_get_month_name,
+    find_letter,
     remove_file,
     save_file,
     find_ranges,
@@ -133,7 +134,6 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
     event_handled = False
     conn = next(get_db())
     try:
-        col_letter = event.col_letter
         currency = event.currency
 
         xlsx_file = Path(event.xlsx_url)
@@ -142,6 +142,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
             if sheet_name not in event.pages:
                 continue
             sheet: Cell = wb_obj[sheet_name]
+            col_letter = find_letter(sheet)
 
             ranges = find_ranges(sheet)
             invoice_update = False
@@ -171,31 +172,33 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                     invoice_update = True
                 contract_dict = {}
                 for row in sheet.iter_rows(
-                    min_row=minrowinfo, max_row=maxrowinfo, max_col=10
+                    min_row=minrowinfo, max_row=maxrowinfo, max_col=15
                 ):
                     cell = row[0].value
                     if cell:
-                        if "NOM CONTRAT" in cell:
+                        if "NOM CONTRAT" in cell or "NOM" in cell:
                             contract_dict["title"] = row[2].value
-                        elif "HEURE" in cell:
+                        elif "HEURE" in cell or "HEURES" in cell:
                             contract_dict["price_unit"] = row[2].value
                         elif "MONTANT" in cell:
                             contract_dict["total_amount"] = row[2].value
-                hours = 0
+                hours: float = 0
                 for col in range(minrow, maxrow):
-                    hour = sheet["{}{}".format(col_letter, col)].value
+                    hour: float = sheet["{}{}".format(col_letter, col)].value
                     hours += float(round(hour, 2))
 
                 price_unit = contract_dict.get("price_unit", None)
                 amount = 0
                 if not price_unit:
-                    amount = int(contract_dict.get("total_amount", 1))
+                    amount = float(contract_dict.get("total_amount", 1))
                     price_unit = round(amount / hours, 2)
                 else:
+                    str_price_unit = str(price_unit).replace("$", "").strip()
+                    price_unit = float(str_price_unit)
                     amount = hours * float(price_unit)
                 contract_dict["hours"] = hours
                 contract_dict["currency"] = currency
-                contract_dict["amount"] = amount
+                contract_dict["amount"] = round(amount, 2)
                 contract_dict["price_unit"] = price_unit
                 contract_dict["file_id"] = event.file_id
                 contract_dict["invoice_id"] = event.invoice_id

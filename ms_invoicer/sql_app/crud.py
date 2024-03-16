@@ -111,13 +111,32 @@ def create_global(db: Session, model: schemas.GlobalCreate):
 
 # Customer ----------------------------------------------------------
 def get_customer(db: Session, model_id: int, current_user_id: int):
-    return (
-        db.query(models.Customer)
-        .filter(
-            models.Customer.id == model_id, models.Customer.user_id == current_user_id
+    invoice_count_subquery = (
+        db.query(
+            models.Invoice.customer_id,
+            func.count(models.Invoice.id).label("num_invoices"),
         )
+        .group_by(models.Invoice.customer_id)
+        .subquery()
+    )
+
+    query_results = (
+        db.query(
+            models.Customer.id,
+            models.Customer.name,
+            func.coalesce(invoice_count_subquery.c.num_invoices, 0).label(
+                "num_invoices"
+            ),
+        )
+        .outerjoin(
+            invoice_count_subquery,
+            models.Customer.id == invoice_count_subquery.c.customer_id,
+        )
+        .filter(models.Customer.user_id == current_user_id, models.Customer.id == model_id)
         .first()
     )
+    return {"id": query_results.id, "name": query_results.name, "num_invoices": query_results.num_invoices}
+    
 
 
 def get_customers(
@@ -210,7 +229,7 @@ def create_customer(db: Session, model: schemas.CustomerCreate):
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
-    return db_model
+    return {"id": db_model.id, "name": db_model.name, "num_invoices": 0}
 
 
 # File ----------------------------------------------------------

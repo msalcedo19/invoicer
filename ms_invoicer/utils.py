@@ -101,27 +101,46 @@ def find_ranges(sheet: Worksheet) -> List[tuple]:
     assumption that each contract occupies 31 rows (31 days in a month).
     """
     result = []
+    start_num_info = None
     start_num = None
     end_num = None
     for row in sheet.iter_rows(max_col=10, max_row=200):
         row_data: Cell = row[0]
-        if (
-            row_data.value
-            and isinstance(row_data.value, str)
-            and row_data.value.startswith("NOM CONTRAT")
-        ):
-            start_num = int(row_data.row)
-        elif (
-            row_data.value
-            and isinstance(row_data.value, str)
-            and row_data.value.startswith("TOTAL")
-        ):
-            end_num = int(row_data.row)
+        if row_data.value and isinstance(row_data.value, str):
+            if (
+                row_data.value.lower().startswith("nom contrat") 
+                or row_data.value.lower().startswith("nom")
+            ):
+                start_num_info = int(row_data.row)
+            elif row_data.value.lower().startswith("total"):
+                end_num = int(row_data.row)
+            elif row_data.value.lower().startswith("date"):
+                start_num = int(row_data.row) + 1
 
-        if start_num and end_num:
-            result.append((start_num, start_num + 2, start_num + 4, end_num))
-            start_num = None
+        if start_num_info and end_num and start_num:
+            result.append((start_num_info, start_num_info + 2, start_num, end_num))
+            start_num_info = None
             end_num = None
+    return result
+
+
+def find_letter(sheet: Worksheet) -> List[tuple]:
+    result = None
+    for row in sheet.iter_rows(max_col=10, max_row=200):
+        row_data: Cell = row[0]
+        if row_data.value and isinstance(row_data.value, str):
+            if row_data.value.lower().startswith("date"):
+                    for col in sheet.iter_cols(min_row=int(row_data.row), max_row=int(row_data.row)+1, max_col=30):
+                        col_data: Cell = col[0]
+                        if (
+                            col_data.value
+                            and isinstance(col_data.value, str)
+                            and col_data.value.lower().startswith("heures")
+                        ):
+                            result = col_data.column_letter
+                            break
+        if result:
+            break
     return result
 
 
@@ -139,6 +158,10 @@ def upload_file(
     :param object_name: S3 object name. If not specified then file_name is used
     :return: True if file was uploaded, else False
     """
+
+    """if ENV != "production":
+        url = "https://" + bucket + ".s3.amazonaws.com/" + file_name
+        return url"""
 
     # If S3 object_name was not specified, use file_name
     if object_name is None:

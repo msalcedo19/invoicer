@@ -42,7 +42,7 @@ def get_customer_invoices(
     db: Session = Depends(get_db),
 ):
     start = 0
-    return schemas.TotalAndInvoices(
+    result =  schemas.TotalAndInvoices(
         total=crud.get_total_invoices_by_customer(
             db=db, model_id=model_id, current_user_id=current_user.id
         ),
@@ -53,6 +53,7 @@ def get_customer_invoices(
             skip=start,
         ),
     )
+    return result
 
 
 @router.patch("/customer/{model_id}", response_model=Union[schemas.Customer, None])
@@ -83,13 +84,13 @@ def delete_customer(
     db: Session = Depends(get_db),
 ):
     invoices = crud.get_invoices_by_customer(
-        db=db, model_id=customer_id, current_user_id=current_user.id
+        db=db, model_id=customer_id, current_user_id=current_user.id, skip=0,
     )
+    files_to_delete = []
     for invoice in invoices:
         files = crud.get_files_by_invoice(
             db=db, model_id=invoice.id, current_user_id=current_user.id
         )
-        files_to_delete = []
         for file in files:
             crud.delete_services_by_file(
                 db=db, model_id=file.id, current_user_id=current_user.id

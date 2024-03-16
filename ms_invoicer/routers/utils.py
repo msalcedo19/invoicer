@@ -30,10 +30,10 @@ def object_to_object(object) -> BreadCrumbs:
             href="/files/{}".format(object.id),
             required_id=object.invoice_id,
         )
-    elif isinstance(object, models.Customer):
+    elif isinstance(object, dict):
         return BreadCrumbs(
-            href="/customer/{}".format(object.id),
-            value=object.name,
+            href="/customer/{}".format(object["id"]),
+            value=object["name"],
         )
     elif isinstance(object, models.Invoice):
         return BreadCrumbs(
