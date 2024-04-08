@@ -264,11 +264,18 @@ def generate_invoice(event: GenerateFinalPDFWithFile):
                     # -1 because the headers
                     # Extract the table data as a list of rows
                     table_data = []
+                    have_nom = False
                     for row in ws.iter_rows(
-                        min_row=minrow - 1, max_row=maxrow, max_col=6, values_only=True
+                        min_row=minrow - 1, max_row=maxrow, max_col=7, values_only=True
                     ):
                         row_data = []
-                        for cell in row:
+                        for index, cell in enumerate(row):
+                            if cell and isinstance(cell, str) and ("Nom, Prenom" in cell or "nom, prenom" in cell):
+                                have_nom = True
+                            if index == 1 and have_nom:
+                                continue
+                            if cell is None and index == 6:
+                                continue
                             if isinstance(cell, datetime):
                                 cell_value = cell.strftime("%Y-%m-%d")
                             elif isinstance(cell, float):
