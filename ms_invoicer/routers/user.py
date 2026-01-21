@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from ms_invoicer.api import get_db
+from ms_invoicer.db_pool import get_db
 from ms_invoicer.security_helper import (
     authenticate_user,
     create_access_token,
@@ -21,8 +21,11 @@ router = APIRouter()
 
 
 @router.post("/authenticate", response_model=schemas.Token)
-def authenticate(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+def authenticate(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -44,8 +47,9 @@ class PasswordCheckRequest(BaseModel):
 def check_password(
     request: PasswordCheckRequest,
     current_user: schemas.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    user = authenticate_user(current_user.username, request.user_password)
+    user = authenticate_user(current_user.username, request.user_password, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

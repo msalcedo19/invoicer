@@ -25,7 +25,7 @@ def post_invoice(
         current_user_id=current_user.id,
     )
     if not result:
-        obj_dict = invoice.dict()
+        obj_dict = invoice.model_dump()
         obj_dict["user_id"] = current_user.id
         return crud.create_invoice(db=db, model=schemas.InvoiceCreate(**obj_dict))
     raise HTTPException(
@@ -36,13 +36,14 @@ def post_invoice(
 
 @router.patch("/invoice/{model_id}", response_model=Union[schemas.Invoice, None])
 def patch_invoice(
-    model_update: dict,
+    model_update: schemas.InvoiceUpdate,
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if "number_id" in model_update and not isinstance(
-        model_update.get("number_id", None), int
+    update_dict = model_update.model_dump(exclude_unset=True)
+    if "number_id" in update_dict and not isinstance(
+        update_dict.get("number_id", None), int
     ):
         raise HTTPException(
             status_code=status.HTTP_406_NOT_ACCEPTABLE,
@@ -51,7 +52,7 @@ def patch_invoice(
     result = crud.patch_invoice(
         db=db,
         model_id=model_id,
-        update_dict=model_update,
+        update_dict=update_dict,
         current_user_id=current_user.id,
     )
     if result:

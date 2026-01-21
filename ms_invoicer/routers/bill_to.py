@@ -14,7 +14,7 @@ def create_bill_to(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    obj_dict = model.dict()
+    obj_dict = model.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_billto(db=db, model=schemas.BillToCreate(**obj_dict))
 
@@ -33,13 +33,17 @@ def get_billtos(
 
 @router.patch("/bill_to/{model_id}", response_model=schemas.BillTo)
 def update_billTo(
-    model: dict,
+    model: schemas.BillToUpdate,
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    update_dict = model.model_dump(exclude_unset=True)
     result = crud.patch_billto(
-        db=db, model_id=model_id, current_user_id=current_user.id, update_dict=model
+        db=db,
+        model_id=model_id,
+        current_user_id=current_user.id,
+        update_dict=update_dict,
     )
     if result:
         return crud.get_billto(

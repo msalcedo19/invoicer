@@ -54,10 +54,16 @@ def create_folders():
     folder_names = ["temp", "temp/xlsx", "temp/pdf", "temp/cache"]
     for folder_name in folder_names:
         if not os.path.exists(folder_name):
-            log.info("Creating folder {} ...".format(folder_name))
+            log.info(
+                "Created folder",
+                extra={"folder_path": folder_name, "event": "create_folder"},
+            )
             os.mkdir(folder_name)
         else:
-            log.info("Folder {} does exist".format(folder_name))
+            log.debug(
+                "Folder already exists",
+                extra={"folder_path": folder_name, "event": "create_folder"},
+            )
 
 
 def save_file(file_path: str, file: UploadFile):
@@ -71,7 +77,10 @@ def remove_file(file_path: str):
     if os.path.isfile(file_path):
         os.remove(file_path)
     else:
-        print(f"'{file_path}' not found!")
+        log.warning(
+            "File not found for removal",
+            extra={"file_path": file_path, "event": "remove_file"},
+        )
 
 
 def find_ranges(sheet: Worksheet) -> List[tuple]:
@@ -197,7 +206,16 @@ def upload_file(
         url = "https://" + bucket + ".s3.amazonaws.com/" + file_name
         return url
     except Exception as e:
-        log.error(e)
+        log.exception(
+            "Failed to upload file to S3",
+            extra={
+                "bucket": bucket,
+                "file_path": file_path,
+                "object_name": object_name,
+                "is_pdf": is_pdf,
+                "event": "upload_file",
+            },
+        )
         raise Exception("Failure uploading file")
 
 
@@ -219,7 +237,15 @@ def download_file_from_s3(
         if not os.path.exists(path_to_save):
             raise Exception("Failure downloading file")
     except Exception as e:
-        log.error(e)
+        log.exception(
+            "Failed to download file from S3",
+            extra={
+                "bucket": bucket,
+                "file_path_s3": file_path_s3,
+                "path_to_save": path_to_save,
+                "event": "download_file",
+            },
+        )
         raise Exception("Failure downloading file")
 
 
@@ -237,7 +263,14 @@ def delete_file_from_s3(file_names: Union[str, list], bucket_name="invoicer-dev-
         else:
             s3_client.delete_object(Bucket=bucket_name, Key=file_names)
     except Exception as e:
-        log.error(e)
+        log.exception(
+            "Failed to delete file(s) from S3",
+            extra={
+                "bucket": bucket_name,
+                "file_names": file_names,
+                "event": "delete_file",
+            },
+        )
         raise Exception("Failure deleting file")
 
 

@@ -16,7 +16,7 @@ from openpyxl.cell.cell import Cell
 from ms_invoicer.config import S3_BUCKET_NAME
 
 from ms_invoicer.dao import FilesToProcessEvent, PdfToProcessEvent
-from ms_invoicer.db_pool import get_db
+from ms_invoicer.db_pool import get_db_context
 from ms_invoicer.event_bus import publish
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.sql_app import models
@@ -36,7 +36,10 @@ log = logging.getLogger(__name__)
 
 
 def extract_pages(uploaded_file: UploadFile, current_user_id: int) -> List[str]:
-    log.info("Customer {} - Getting pages - fun: get_pages".format(current_user_id))
+    log.info(
+        "Extracting xlsx pages",
+        extra={"customer_id": current_user_id, "event": "extract_pages"},
+    )
     try:
         date_now = get_current_date()
 
@@ -50,11 +53,11 @@ def extract_pages(uploaded_file: UploadFile, current_user_id: int) -> List[str]:
         results = wb_obj.sheetnames
         remove_file(file_path)
         return results
-    except Exception as e:
-        log.error(
-            "Customer {} - Error getting pages - fun: get_pages".format(current_user_id)
+    except Exception:
+        log.exception(
+            "Failed to extract xlsx pages",
+            extra={"customer_id": current_user_id, "event": "extract_pages"},
         )
-        log.error(e)
         return []
 
 
@@ -64,13 +67,20 @@ async def process_file(
     bill_to_id: int,
     current_user_id: int,
     col_letter: str = "F",
-    pages: List[str] = [],
+    pages: Union[List[str], None] = None,
 ) -> schemas.File:
     if file is None:
         return None, None
+    pages = pages or []
     try:
         log.info(
-            "Customer {} - Processing file - fun: process_file".format(current_user_id)
+            "Processing xlsx upload",
+            extra={
+                "customer_id": current_user_id,
+                "invoice_id": invoice_id,
+                "bill_to_id": bill_to_id,
+                "event": "process_file",
+            },
         )
         date_now = get_current_date()
         filename = f"{date_now.year}{date_now.month}{date_now.day}{date_now.hour}{date_now.minute}{date_now.second}-{str(uuid4())}.xlsx"
@@ -80,8 +90,13 @@ async def process_file(
 
         price_unit = 1
         currency = "CAD"
-        log.info(
-            "Customer {} - Uploading file - fun: process_file".format(current_user_id)
+        log.debug(
+            "Uploading xlsx to S3",
+            extra={
+                "customer_id": current_user_id,
+                "invoice_id": invoice_id,
+                "event": "process_file",
+            },
         )
         s3_url = upload_file(
             file_path=file_path, file_name=filename, bucket=S3_BUCKET_NAME
@@ -97,130 +112,149 @@ async def process_file(
                 "user_id": current_user_id,
             }
         )
-        new_file = crud.create_file(db=next(get_db()), model=file_obj)
-        data_event = FilesToProcessEvent(
-            file_path=file_path,
-            file_id=new_file.id,
-            invoice_id=invoice_id,
-            current_user_id=current_user_id,
-            price_unit=price_unit,
-            col_letter=col_letter,
-            currency=currency,
-            pages=pages,
-        )
-        log.info(
-            "Customer {} - Publishing process event - fun: process_file".format(
-                current_user_id
+        with get_db_context() as db:
+            new_file = crud.create_file(db=db, model=file_obj)
+            data_event = FilesToProcessEvent(
+                file_path=file_path,
+                file_id=new_file.id,
+                invoice_id=invoice_id,
+                current_user_id=current_user_id,
+                price_unit=price_unit,
+                col_letter=col_letter,
+                currency=currency,
+                pages=pages,
             )
-        )
-        await publish(data_event)
-        return new_file, file_path
-    except Exception as e:
-        log.error(
-            "Customer {} - Failure processing file - fun: process_file".format(
-                current_user_id
+            log.info(
+                "Publishing file processing event",
+                extra={
+                    "customer_id": current_user_id,
+                    "invoice_id": invoice_id,
+                    "file_id": new_file.id,
+                    "event": "process_file",
+                },
             )
+            await publish(data_event)
+            return new_file, file_path
+    except Exception:
+        log.exception(
+            "Failed to process xlsx upload",
+            extra={
+                "customer_id": current_user_id,
+                "invoice_id": invoice_id,
+                "bill_to_id": bill_to_id,
+                "event": "process_file",
+            },
         )
-        log.error(e)
         raise
 
 
 async def extract_data(event: FilesToProcessEvent) -> bool:
     log.info(
-        "Customer {} - Extracting data - fun: extract_data".format(
-            event.current_user_id
-        )
+        "Extracting invoice data from xlsx",
+        extra={
+            "customer_id": event.current_user_id,
+            "invoice_id": event.invoice_id,
+            "file_id": event.file_id,
+            "event": "extract_data",
+        },
     )
     event_handled = False
-    conn = next(get_db())
-    try:
-        currency = event.currency
+    with get_db_context() as conn:
+        try:
+            currency = event.currency
 
-        xlsx_file = Path(event.xlsx_url)
-        wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
-        for sheet_name in wb_obj.sheetnames:
-            if sheet_name not in event.pages:
-                continue
-            sheet: Cell = wb_obj[sheet_name]
-            col_letter = find_letter(sheet)
+            xlsx_file = Path(event.xlsx_url)
+            wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
+            for sheet_name in wb_obj.sheetnames:
+                if sheet_name not in event.pages:
+                    continue
+                sheet: Cell = wb_obj[sheet_name]
+                col_letter = find_letter(sheet)
 
-            ranges = find_ranges(sheet)
-            invoice_update = False
-            for range_of in ranges:
-                (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
-                if not invoice_update:
-                    parsed_date = str(sheet["{}{}".format("A", maxrow - 1)].value)
-                    date_formats = [
-                        "%d/%m/%Y %H:%M:%S",
-                        "%d/%m/%Y",
-                        "%d-%m-%Y %H:%M:%S",
-                        "%d-%m-%Y",
-                    ]
-                    for date_format in date_formats:
-                        try:
-                            parsed_date = datetime.strptime(parsed_date, date_format)
-                            break  # Break out of the loop if parsing is successful
-                        except ValueError:
-                            pass
+                ranges = find_ranges(sheet)
+                invoice_update = False
+                for range_of in ranges:
+                    (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
+                    if not invoice_update:
+                        parsed_date = str(sheet["{}{}".format("A", maxrow - 1)].value)
+                        date_formats = [
+                            "%d/%m/%Y %H:%M:%S",
+                            "%d/%m/%Y",
+                            "%d-%m-%Y %H:%M:%S",
+                            "%d-%m-%Y",
+                        ]
+                        for date_format in date_formats:
+                            try:
+                                parsed_date = datetime.strptime(parsed_date, date_format)
+                                break  # Break out of the loop if parsing is successful
+                            except ValueError:
+                                pass
 
-                    crud.patch_invoice(
-                        db=conn,
-                        model_id=event.invoice_id,
-                        current_user_id=event.current_user_id,
-                        update_dict={"created": parsed_date},
-                    )
-                    invoice_update = True
-                contract_dict = {}
-                for row in sheet.iter_rows(
-                    min_row=minrowinfo, max_row=maxrowinfo, max_col=15
-                ):
-                    cell = row[0].value
-                    if cell:
-                        if "NOM CONTRAT" in cell or "NOM" in cell:
-                            contract_dict["title"] = row[2].value
-                        elif "HEURE" in cell or "HEURES" in cell:
-                            contract_dict["price_unit"] = row[2].value
-                        elif "MONTANT" in cell:
-                            contract_dict["total_amount"] = row[2].value
-                hours: float = 0
-                for col in range(minrow, maxrow):
-                    hour: float = sheet["{}{}".format(col_letter, col)].value
-                    hours += float(round(hour, 2))
+                        crud.patch_invoice(
+                            db=conn,
+                            model_id=event.invoice_id,
+                            current_user_id=event.current_user_id,
+                            update_dict={"created": parsed_date},
+                        )
+                        invoice_update = True
+                    contract_dict = {}
+                    for row in sheet.iter_rows(
+                        min_row=minrowinfo, max_row=maxrowinfo, max_col=15
+                    ):
+                        cell = row[0].value
+                        if cell:
+                            if "NOM CONTRAT" in cell or "NOM" in cell:
+                                contract_dict["title"] = row[2].value
+                            elif "HEURE" in cell or "HEURES" in cell:
+                                contract_dict["price_unit"] = row[2].value
+                            elif "MONTANT" in cell:
+                                contract_dict["total_amount"] = row[2].value
+                    hours: float = 0
+                    for col in range(minrow, maxrow):
+                        hour: float = sheet["{}{}".format(col_letter, col)].value
+                        hours += float(round(hour, 2))
 
-                price_unit = contract_dict.get("price_unit", None)
-                amount = 0
-                if not price_unit:
-                    amount = float(contract_dict.get("total_amount", 1))
-                    price_unit = round(amount / hours, 2)
-                else:
-                    str_price_unit = str(price_unit).replace("$", "").strip()
-                    price_unit = float(str_price_unit)
-                    amount = hours * float(price_unit)
-                contract_dict["hours"] = hours
-                contract_dict["currency"] = currency
-                contract_dict["amount"] = round(amount, 2)
-                contract_dict["price_unit"] = price_unit
-                contract_dict["file_id"] = event.file_id
-                contract_dict["invoice_id"] = event.invoice_id
-                contract_dict["user_id"] = event.current_user_id
-                service_created = schemas.ServiceCreate(**contract_dict)
-                crud.create_service(db=conn, model=service_created)
+                    price_unit = contract_dict.get("price_unit", None)
+                    amount = 0
+                    if not price_unit:
+                        amount = float(contract_dict.get("total_amount", 1))
+                        price_unit = round(amount / hours, 2)
+                    else:
+                        str_price_unit = str(price_unit).replace("$", "").strip()
+                        price_unit = float(str_price_unit)
+                        amount = hours * float(price_unit)
+                    contract_dict["hours"] = hours
+                    contract_dict["currency"] = currency
+                    contract_dict["amount"] = round(amount, 2)
+                    contract_dict["price_unit"] = price_unit
+                    contract_dict["file_id"] = event.file_id
+                    contract_dict["invoice_id"] = event.invoice_id
+                    contract_dict["user_id"] = event.current_user_id
+                    service_created = schemas.ServiceCreate(**contract_dict)
+                    crud.create_service(db=conn, model=service_created)
 
-        log.info(
-            "Customer {} - Success extracting data - fun: extract_data".format(
-                event.current_user_id
+            log.info(
+                "Extracted invoice data from xlsx",
+                extra={
+                    "customer_id": event.current_user_id,
+                    "invoice_id": event.invoice_id,
+                    "file_id": event.file_id,
+                    "event": "extract_data",
+                },
             )
-        )
-        event_handled = True
-        return event_handled
-    except Exception as e:
-        log.error(
-            "Customer {} - Failure extracting data - fun: extract_data".format(
-                event.current_user_id
+            event_handled = True
+            return event_handled
+        except Exception:
+            log.exception(
+                "Failed to extract invoice data from xlsx",
+                extra={
+                    "customer_id": event.current_user_id,
+                    "invoice_id": event.invoice_id,
+                    "file_id": event.file_id,
+                    "event": "extract_data",
+                },
             )
-        )
-        log.error(e)
-        raise
+            raise
 
 
 async def process_pdf(
@@ -231,10 +265,17 @@ async def process_pdf(
     current_user: User,
     new_file_obj: schemas.File,
     xlsx_local_path: str,
-    pages: List[str] = [],
+    pages: Union[List[str], None] = None,
 ):
+    pages = pages or []
     log.info(
-        "Customer {} - Processing pdf_file - fun: process_pdf".format(current_user.id)
+        "Processing PDF creation",
+        extra={
+            "customer_id": current_user.id,
+            "invoice_id": invoice.id,
+            "bill_to_id": bill_to_id,
+            "event": "process_pdf",
+        },
     )
     current_date = get_current_date()
     with_file = False
@@ -252,22 +293,30 @@ async def process_pdf(
         )
         new_file = crud.create_file(db=db, model=file_obj)
         log.info(
-            "Customer {} - File without xlsx created - fun: process_pdf".format(
-                current_user.id
-            )
+            "Created file record without xlsx",
+            extra={
+                "customer_id": current_user.id,
+                "invoice_id": invoice.id,
+                "file_id": new_file.id,
+                "event": "process_pdf",
+            },
         )
     else:
         new_file = new_file_obj
         with_file = True
-        log.info(
-            "Customer {} - Using file with xlsx - fun: process_pdf".format(
-                current_user.id
-            )
+        log.debug(
+            "Using existing xlsx for PDF creation",
+            extra={
+                "customer_id": current_user.id,
+                "invoice_id": invoice.id,
+                "file_id": new_file.id,
+                "event": "process_pdf",
+            },
         )
 
     result = []
     for contract in contracts:
-        obj_dict = contract.dict()
+        obj_dict = contract.model_dump()
         obj_dict["user_id"] = current_user.id
         obj_dict["invoice_id"] = invoice.id
         obj_dict["file_id"] = new_file.id
@@ -275,7 +324,14 @@ async def process_pdf(
             crud.create_service(db=db, model=schemas.ServiceCreate(**obj_dict))
         )
     log.info(
-        "Customer {} - Contracts created - fun: process_pdf".format(current_user.id)
+        "Created invoice services",
+        extra={
+            "customer_id": current_user.id,
+            "invoice_id": invoice.id,
+            "file_id": new_file.id,
+            "service_count": len(result),
+            "event": "process_pdf",
+        },
     )
 
     template_name = "template01.html"
@@ -291,7 +347,13 @@ async def process_pdf(
         pages=pages,
     )
     log.info(
-        "Customer {} - Publishing pdf event - fun: process_pdf".format(current_user.id)
+        "Publishing PDF build event",
+        extra={
+            "customer_id": current_user.id,
+            "invoice_id": invoice.id,
+            "file_id": new_file.id,
+            "event": "process_pdf",
+        },
     )
     await publish(data_event)
     crud.patch_invoice(
@@ -311,9 +373,14 @@ async def generate_summary_by_date(
     end_date: datetime,
 ):
     log.info(
-        "Customer {} - Generating summary - fun: generate_summary_by_date".format(
-            current_user.id
-        )
+        "Generating summary by date",
+        extra={
+            "customer_id": current_user.id,
+            "target_customer_id": customer_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "event": "generate_summary_by_date",
+        },
     )
     invoices_by_customer = crud.get_invoices_by_customer_and_date_range(
         db=db,
@@ -346,9 +413,12 @@ async def generate_summary_by_date(
             )
 
     log.info(
-        "Customer {} - Downloading xlsx files - fun: generate_summary_by_date".format(
-            current_user.id
-        )
+        "Downloading xlsx files for summary",
+        extra={
+            "customer_id": current_user.id,
+            "target_customer_id": customer_id,
+            "event": "generate_summary_by_date",
+        },
     )
     xlsx_path_name_list: List[FileToProcess] = []
     for xlsx in xlsx_list:
@@ -473,13 +543,17 @@ async def generate_summary_by_date(
         )
         return s3_url
 
-    except Exception as e:
-        log.error(
-            "Customer {} - Failure generating summary - fun: generate_summary_by_date".format(
-                current_user.id
-            )
+    except Exception:
+        log.exception(
+            "Failed to generate summary by date",
+            extra={
+                "customer_id": current_user.id,
+                "target_customer_id": customer_id,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "event": "generate_summary_by_date",
+            },
         )
-        log.error(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Hubo un error generanto el resumen",

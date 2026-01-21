@@ -1,8 +1,16 @@
+import asyncio
+import inspect
+import types
 from typing import Any, Callable, Coroutine, List, Type, Union, cast
+
+# Compatibility shim for Python 3.12+ where asyncio.coroutine was removed.
+if not hasattr(asyncio, "coroutine"):
+    asyncio.coroutine = types.coroutine  # type: ignore[attr-defined]
 
 from awebus import Bus
 
-bus = Bus()
+# Avoid weakref handler collection when we wrap handlers at runtime.
+bus = Bus(event_use_weakref=False)
 
 
 def _event_type(clazz: Type) -> str:
@@ -19,6 +27,19 @@ class Event:
 
 
 EventHandlerType = Callable[..., Coroutine[Any, Event, Any]]
+
+
+def _ensure_async(handler: Callable[..., Any]) -> EventHandlerType:
+    if asyncio.iscoroutinefunction(handler):
+        return cast(EventHandlerType, handler)
+
+    async def _wrapper(*args: Any, **kwargs: Any):
+        result = handler(*args, **kwargs)
+        if inspect.isawaitable(result):
+            return await result
+        return result
+
+    return cast(EventHandlerType, _wrapper)
 
 
 def unregister(event_type: Type, async_event_handler: Callable[..., Coroutine[Any, Event, Any]]):
@@ -44,9 +65,9 @@ def register(
     if type(async_event_handler) == list:
         handlers: List[EventHandlerType] = cast(List[EventHandlerType], async_event_handler)
         for h in handlers:
-            bus.on(_event_type(event_type), h)
+            bus.on(_event_type(event_type), _ensure_async(h))
     else:
-        bus.on(_event_type(event_type), async_event_handler)
+        bus.on(_event_type(event_type), _ensure_async(async_event_handler))
 
 
 async def publish(event: Event):

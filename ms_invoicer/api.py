@@ -8,15 +8,13 @@ from sqlalchemy.orm import Session
 
 from ms_invoicer.config import LOG_LEVEL
 from ms_invoicer.db_pool import get_db
+from ms_invoicer.sql_app.database import init_db
 from ms_invoicer.event_handler import register_event_handlers
 from ms_invoicer.routers import bill_to, customer, files, invoice, user, globals, utils
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import create_folders
 from ms_invoicer.no_upload_helper import populate_db
-
-create_folders()
-populate_db()
 
 api = FastAPI()
 api.add_middleware(
@@ -38,7 +36,13 @@ logging.basicConfig(
     format="[%(asctime)s] %(levelname)-8s - %(message)s", level=LOG_LEVEL
 )
 log = logging.getLogger(__name__)
-register_event_handlers()
+
+
+@api.on_event("startup")
+def startup_tasks():
+    init_db()
+    create_folders()
+    register_event_handlers()
 
 
 @api.middleware("http")
@@ -46,7 +50,16 @@ async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
-    log.info(f"Request: {request.url} completed in {process_time} seconds")
+    log.info(
+        "Request completed",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration_ms": int(process_time * 1000),
+            "event": "request_timing",
+        },
+    )
     return response
 
 
@@ -73,7 +86,7 @@ def post_service(
 ):
     result = []
     for contract in contracts:
-        obj_dict = contract.dict()
+        obj_dict = contract.model_dump()
         obj_dict["user_id"] = current_user.id
         result.append(
             crud.create_service(db=db, model=schemas.ServiceCreate(**obj_dict))
