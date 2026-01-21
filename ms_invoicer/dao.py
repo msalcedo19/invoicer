@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from ms_invoicer.event_bus import Event
 from ms_invoicer.sql_app.schemas import File, Invoice
 
@@ -13,7 +13,7 @@ class FilesToProcessEvent(Event):
         price_unit: int,
         col_letter: str,
         currency: str,
-        pages: List[str] = []
+        pages: Optional[List[str]] = None
     ) -> None:
         self.xlsx_url = file_path
         self.file_id = file_id
@@ -22,7 +22,7 @@ class FilesToProcessEvent(Event):
         self.price_unit = price_unit
         self.col_letter = col_letter
         self.currency = currency
-        self.pages = pages
+        self.pages = pages or []
 
 
 class PdfToProcessEvent(Event):
@@ -38,7 +38,7 @@ class PdfToProcessEvent(Event):
         html_template_name: str,
         xlsx_url: str,
         with_file: bool = True,
-        pages: List[str] = []
+        pages: Optional[List[str]] = None
     ):
         self.current_user_id = current_user_id
         self.invoice = invoice
@@ -46,7 +46,7 @@ class PdfToProcessEvent(Event):
         self.html_template_name = html_template_name
         self.xlsx_url = xlsx_url
         self.with_file = with_file
-        self.pages = pages
+        self.pages = pages or []
 
 
 class GenerateFinalPDF(Event):
@@ -75,14 +75,14 @@ class GenerateFinalPDFWithFile(GenerateFinalPDF):
         filename: str,
         file_id: int,
         with_tables: bool = True,
-        pages: List[str] = []
+        pages: Optional[List[str]] = None
     ):
         super().__init__(current_user_id=current_user_id, filename=filename, file_id=file_id)
         self.path_pdf_tables = pdf_tables
         self.xlsx_url = xlsx_url
         self.path_pdf_invoice = pdf_invoice
         self.with_tables = with_tables
-        self.pages = pages
+        self.pages = pages or []
 
 
 class GenerateFinalPDFNoFile(GenerateFinalPDF):

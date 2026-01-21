@@ -58,16 +58,17 @@ def get_customer_invoices(
 
 @router.patch("/customer/{model_id}", response_model=Union[schemas.Customer, None])
 def patch_customer(
-    model_update: dict,
+    model_update: schemas.CustomerUpdate,
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    update_dict = model_update.model_dump(exclude_unset=True)
     result = crud.patch_customer(
         db=db,
         model_id=model_id,
         current_user_id=current_user.id,
-        update_dict=model_update,
+        update_dict=update_dict,
     )
     if result:
         return crud.get_customer(
@@ -119,7 +120,7 @@ def post_customer(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    obj_dict = customer.dict()
+    obj_dict = customer.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_customer(db=db, model=schemas.CustomerCreate(**obj_dict))
 

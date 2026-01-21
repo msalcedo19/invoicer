@@ -48,15 +48,16 @@ def get_files(
 
 @router.patch("/files/{model_id}", response_model=Union[schemas.File, None])
 def patch_file(
-    model_update: dict,
+    model_update: schemas.FileUpdate,
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    update_dict = model_update.model_dump(exclude_unset=True)
     result = crud.patch_file(
         db=db,
         model_id=model_id,
-        update_dict=model_update,
+        update_dict=update_dict,
         current_user_id=current_user.id,
     )
     if result:
@@ -123,7 +124,7 @@ async def create_file(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    obj_dict = file.dict()
+    obj_dict = file.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_file(
         db=db, model=schemas.FileCreate(**obj_dict), current_user_id=current_user.id
@@ -206,7 +207,7 @@ async def generate_pdf(
                     new_invoice.with_taxes = with_taxes
                     new_invoice.with_tables = with_tables
             else:
-                obj_dict = invoice.dict()
+                obj_dict = invoice.model_dump(exclude_unset=True)
                 obj_dict["user_id"] = current_user.id
                 new_invoice = crud.create_invoice(
                     db=db, model=schemas.InvoiceCreate(**obj_dict)
@@ -232,7 +233,14 @@ async def generate_pdf(
                 pages=pages_formatted,
             )
         except Exception as e:
-            log.error("Customer {} - {}".format(current_user.id, e))
+            log.exception(
+                "Failed to generate invoice from upload",
+                extra={
+                    "customer_id": current_user.id,
+                    "invoice_id": getattr(new_invoice, "id", None),
+                    "event": "create_invoice_from_file",
+                },
+            )
             files = crud.get_files_by_invoice(
                 db=db, model_id=new_invoice.id, current_user_id=current_user.id
             )

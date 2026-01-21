@@ -5,12 +5,14 @@ from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from ms_invoicer.config import ALGORITHM, SECRET_KEY
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.sql_app import crud, schemas
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use PBKDF2 to avoid bcrypt backend issues under Python 3.12.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="authenticate/")
 
 
@@ -45,8 +47,7 @@ def get_payload_from_header(authorization: str = Header(...)):
     return payload
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    connection = next(get_db())
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -58,7 +59,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         if username is None:
             raise credentials_exception
         token_data = schemas.TokenData(username=username)
-        user = crud.get_user_by_username(db=connection, username=token_data.username)
+        user = crud.get_user_by_username(db=db, username=token_data.username)
         if user is None:
             raise credentials_exception
         return user
@@ -66,9 +67,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 
 
-def authenticate_user(username: str, password: str):
-    connection = next(get_db())
-    user = crud.get_user_by_username(db=connection, username=username)
+def authenticate_user(username: str, password: str, db: Session):
+    user = crud.get_user_by_username(db=db, username=username)
     if not user:
         return False
     if not verify_password(password, user.hashpass):

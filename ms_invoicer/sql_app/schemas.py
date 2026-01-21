@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Union, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # USER -------------------------------------------------------------
@@ -39,8 +39,7 @@ class User(BaseModel):
     id: int
     username: str
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Template -------------------------------------------------------------
@@ -57,8 +56,7 @@ class TemplateCreate(TemplateBase):
 class Template(TemplateBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Global -------------------------------------------------------------
@@ -77,8 +75,7 @@ class GlobalCreate(GlobalBase):
 class Global(GlobalBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # SERVICE -------------------------------------------------------------
@@ -105,8 +102,7 @@ class ServiceCreateNoFile(BaseModel):
 class Service(ServiceBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # BILLTO -------------------------------------------------------------
@@ -121,11 +117,17 @@ class BillToCreate(BillToBase):
     user_id: int
 
 
+class BillToUpdate(BaseModel):
+    to: Optional[str] = None
+    addr: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
 class BillTo(BillToBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # TOPINFO -------------------------------------------------------------
@@ -143,8 +145,7 @@ class TopInfoCreate(TopInfoBase):
 class TopInfo(TopInfoBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # FILE -------------------------------------------------------------
@@ -161,6 +162,15 @@ class FileCreate(FileBase):
     user_id: int
 
 
+class FileUpdate(BaseModel):
+    s3_xlsx_url: Optional[str] = None
+    s3_pdf_url: Optional[str] = None
+    pages_xlsx: Optional[str] = None
+    created: Optional[datetime] = None
+    invoice_id: Optional[int] = None
+    bill_to_id: Optional[int] = None
+
+
 # CUSTOMER -------------------------------------------------------------
 class CustomerBase(BaseModel):
     name: str
@@ -168,6 +178,10 @@ class CustomerBase(BaseModel):
 
 class CustomerCreate(CustomerBase):
     user_id: int
+
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
 
 
 # INVOICE -------------------------------------------------------------
@@ -187,11 +201,22 @@ class InvoiceCreate(InvoiceBase):
     user_id: int
 
 
+class InvoiceUpdate(BaseModel):
+    number_id: Optional[int] = None
+    reason: Optional[str] = None
+    tax_1: Optional[float] = None
+    tax_2: Optional[float] = None
+    with_taxes: Optional[bool] = None
+    with_tables: Optional[bool] = None
+    created: Optional[datetime] = None
+    updated: Optional[datetime] = None
+    customer_id: Optional[int] = None
+
+
 class InvoiceLite(InvoiceBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # FILE -------------------------------------------------------------
@@ -200,15 +225,13 @@ class File(FileBase):
     bill_to: BillTo
     services: list[Service] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FileLite(FileBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # INVOICE -------------------------------------------------------------
@@ -216,8 +239,7 @@ class Invoice(InvoiceBase):
     id: int
     files: List[File] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # CUSTOMER -------------------------------------------------------------
@@ -225,16 +247,14 @@ class Customer(CustomerBase):
     id: int
     num_invoices: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CustomerFull(CustomerBase):
     id: int
     invoices: List[Invoice]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 # TOTALS
 class TotalAndCustomer(BaseModel):

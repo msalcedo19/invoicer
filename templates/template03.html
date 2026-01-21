@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Invoice {{invoice_id}}</title>
+<style>
+      .invoice-box {
+        max-width: 800px;
+        margin: auto;
+        padding: 80px;
+        border: 1px solid #eee;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+        font-size: 16px;
+        line-height: 24px;
+        font-family: "Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif;
+        color: #555;
+      }
+
+      .invoice-box table {
+        width: 100%;
+        line-height: inherit;
+        text-align: left;
+      }
+
+      .invoice-box table td {
+        padding: 5px;
+        vertical-align: top;
+      }
+
+      .invoice-box table tr.top table td {
+        padding-bottom: 80px;
+      }
+
+      .invoice-box table tr.top td.title {
+        font-size: 45px;
+        line-height: 45px;
+        color: #333;
+        text-align: center;
+        padding-bottom: 25px;
+      }
+
+      .invoice-box table tr.information table td {
+        padding-bottom: 120px;
+      }
+
+      .invoice-box table tr.heading td {
+        background: #eee;
+        border-bottom: 1px solid #ddd;
+        font-weight: bold;
+      }
+
+      .invoice-box table tr.item td {
+        border-bottom: 1px solid #eee;
+      }
+
+      .invoice-box table tr.item.last td {
+        border-bottom: none;
+      }
+
+      .invoice_info {
+        text-align: left;
+      }
+
+      .nowrap-text {
+        white-space: nowrap;
+      }
+
+      .subtitle_info {
+        text-align: right;
+      }
+
+      .invoice-box table tr.total td:nth-child(4) {
+        border-top: 2px solid #eee;
+        font-weight: bold;
+      }
+
+      /** RTL **/
+      .invoice-box.rtl {
+        direction: rtl;
+        font-family: Tahoma, "Helvetica Neue", "Helvetica", Helvetica, Arial,
+          sans-serif;
+      }
+
+      .invoice-box.rtl table {
+        text-align: right;
+      }
+
+      .invoice-box.rtl table tr td:nth-child(2) {
+        text-align: left;
+      }
+    </style>
+</head>
+<body>
+<div class="invoice-box">
+<table cellpadding="0" cellspacing="0">
+<tr class="top">
+<td class="title" colspan="5">{{title_company}}</td>
+</tr>
+<tr>
+<td colspan="5">
+<table>
+<tr>
+<td class="nowrap-text">
+                  {{top_info_from}}<br/>
+                  {{top_info_addr}}<br/>
+                  {{top_info_email}}<br/>
+                  {{top_info_phone}}
+                </td>
+<td style="width: 100%"></td>
+<td class="invoice_info nowrap-text">
+                  Facture #: {{invoice_id}}<br/>
+                  Date: {{invoice_date}}<br/>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr class="information">
+<td colspan="5">
+<table>
+<tr>
+<td>
+                  {{to}}<br/>
+                  {{addr}}<br/>
+                  {{email}}<br/>
+                  {{phone}}
+                </td>
+<td></td>
+</tr>
+</table>
+</td>
+</tr>
+<tr class="heading">
+<td>ID</td>
+<td>Service</td>
+<td>Heures</td>
+<td>Montant (CAD)</td>
+</tr>
+<div><tr><td>{{service_id0}}</td><td>{{service_txt0}}</td><td>{{num_hours0}}</td><td>{{amount0}}</td></tr></div>
+<tr class="total">
+<td></td>
+<td></td>
+<td class="subtitle_info">Total:</td>
+<td>{{total}}</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, func
 
 from ms_invoicer.sql_app import models, schemas
@@ -27,7 +27,7 @@ def get_template(db: Session, current_user_id: int):
 
 
 def create_template(db: Session, model: schemas.TemplateCreate):
-    db_model = models.Template(**model.dict())
+    db_model = models.Template(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -54,7 +54,7 @@ def patch_topinfo(db: Session, model_id: int, current_user_id: int, update_dict:
 
 
 def create_topinfo(db: Session, model: schemas.TopInfoCreate):
-    db_model = models.TopInfo(**model.dict())
+    db_model = models.TopInfo(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -102,7 +102,7 @@ def patch_global(db: Session, model_id: int, current_user_id: int, update_dict: 
 
 
 def create_global(db: Session, model: schemas.GlobalCreate):
-    db_model = models.Globals(**model.dict())
+    db_model = models.Globals(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -225,7 +225,7 @@ def delete_customer(db: Session, model_id: int, current_user_id: int):
 
 
 def create_customer(db: Session, model: schemas.CustomerCreate):
-    db_model = models.Customer(**model.dict())
+    db_model = models.Customer(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -236,6 +236,19 @@ def create_customer(db: Session, model: schemas.CustomerCreate):
 def get_file(db: Session, model_id: int, current_user_id: int):
     return (
         db.query(models.File)
+        .filter(models.File.id == model_id, models.File.user_id == current_user_id)
+        .first()
+    )
+
+
+def get_file_with_relations(db: Session, model_id: int, current_user_id: int):
+    return (
+        db.query(models.File)
+        .options(
+            joinedload(models.File.services),
+            joinedload(models.File.bill_to),
+            joinedload(models.File.invoice),
+        )
         .filter(models.File.id == model_id, models.File.user_id == current_user_id)
         .first()
     )
@@ -305,7 +318,7 @@ def delete_files_by_invoice(db: Session, model_id: int, current_user_id: int):
 
 
 def create_file(db: Session, model: schemas.FileCreate):
-    db_model = models.File(**model.dict())
+    db_model = models.File(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -357,7 +370,7 @@ def delete_billto(db: Session, model_id: int, current_user_id: int):
 
 
 def create_billto(db: Session, model: schemas.BillToCreate):
-    db_model = models.BillTo(**model.dict())
+    db_model = models.BillTo(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -417,7 +430,7 @@ def delete_service(db: Session, model_id: int, current_user_id: int):
 
 
 def create_service(db: Session, model: schemas.ServiceCreate):
-    db_model = models.Service(**model.dict())
+    db_model = models.Service(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -559,7 +572,7 @@ def delete_invoices_by_customer(db: Session, model_id: int, current_user_id: int
 
 
 def create_invoice(db: Session, model: schemas.InvoiceCreate):
-    db_model = models.Invoice(**model.dict())
+    db_model = models.Invoice(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)
@@ -568,7 +581,7 @@ def create_invoice(db: Session, model: schemas.InvoiceCreate):
 
 # User -----------------------------------
 def create_user(db: Session, model: schemas.UserCreate):
-    db_model = models.User(**model.dict())
+    db_model = models.User(**model.model_dump())
     db.add(db_model)
     db.commit()
     db.refresh(db_model)

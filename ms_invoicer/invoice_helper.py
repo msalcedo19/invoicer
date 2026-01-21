@@ -8,7 +8,29 @@ from datetime import datetime
 from uuid import uuid4
 from bs4 import BeautifulSoup
 from openpyxl import load_workbook
-from pypdf import PdfMerger
+try:
+    from pypdf import PdfMerger
+except ImportError:  # pypdf>=5 removed PdfMerger
+    from pypdf import PdfReader, PdfWriter
+
+    class PdfMerger:  # minimal adapter for existing usage
+        def __init__(self) -> None:
+            self._writer = PdfWriter()
+
+        def append(self, fileobj) -> None:
+            reader = PdfReader(fileobj)
+            for page in reader.pages:
+                self._writer.add_page(page)
+
+        def write(self, fileobj) -> None:
+            if isinstance(fileobj, (str, bytes, os.PathLike)):
+                with open(os.fspath(fileobj), "wb") as handle:
+                    self._writer.write(handle)
+            else:
+                self._writer.write(fileobj)
+
+        def close(self) -> None:
+            pass
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import PageBreak, SimpleDocTemplate, Table, TableStyle
@@ -19,9 +41,9 @@ from ms_invoicer.dao import (
     GenerateFinalPDFWithFile,
     PdfToProcessEvent,
 )
-from ms_invoicer.db_pool import get_db
+from ms_invoicer.db_pool import get_db_context
 from ms_invoicer.event_bus import publish
-from ms_invoicer.utils import find_ranges, upload_file
+from ms_invoicer.utils import find_ranges, remove_file, upload_file
 from ms_invoicer.sql_app import crud
 
 base = os.path.dirname(os.path.dirname(__file__))
@@ -31,193 +53,224 @@ log = logging.getLogger(__name__)
 async def build_pdf(event: PdfToProcessEvent):
     try:
         log.info(
-            "Customer {} - Initiated building pdf - fun: build_pdf".format(
-                event.current_user_id
+            "Building PDF from invoice data",
+            extra={
+                "customer_id": event.current_user_id,
+                "invoice_id": event.invoice.id if event.invoice else None,
+                "file_id": event.file.id if event.file else None,
+                "event": "build_pdf",
+            },
+        )
+        with get_db_context() as connection:
+            input_html_path: str = os.path.join(
+                base, "templates/base/{}".format(event.html_template_name)
             )
-        )
-        connection = next(get_db())
-        input_html_path: str = os.path.join(
-            base, "templates/base/{}".format(event.html_template_name)
-        )
-        output_html_path: str = os.path.join(
-            base, "templates/{}".format(event.html_template_name)
-        )
-        event.file = crud.get_file(
-            db=connection, current_user_id=event.current_user_id, model_id=event.file.id
-        )
-        event.invoice = crud.get_invoice(
-            db=connection,
-            current_user_id=event.current_user_id,
-            model_id=event.invoice.id,
-        )
-        with open(input_html_path) as fp:
-            soup = BeautifulSoup(fp, "html.parser")
+            output_html_path: str = os.path.join(
+                base, "templates/{}".format(event.html_template_name)
+            )
+            event.file = crud.get_file(
+                db=connection,
+                current_user_id=event.current_user_id,
+                model_id=event.file.id,
+            )
+            event.invoice = crud.get_invoice(
+                db=connection,
+                current_user_id=event.current_user_id,
+                model_id=event.invoice.id,
+            )
+            with open(input_html_path) as fp:
+                soup = BeautifulSoup(fp, "html.parser")
 
-            new_tag = soup.new_tag("div")
-            for index in range(0, len(event.file.services)):
-                new_tr_tag = soup.new_tag("tr")
-                for variable in [
-                    "service_id",
-                    "service_txt",
-                    "num_hours",
-                    "amount",
-                ]:
-                    new_td_tag = soup.new_tag("td")
-                    new_td_tag.string = "{{" + variable + str(index) + "}}"
-                    new_tr_tag.append(new_td_tag)
-                new_tag.append(new_tr_tag)
-            for comment in soup.find_all(string=lambda e: isinstance(e, bs4.Comment)):
-                if "items" in comment:
-                    comment.replace_with(new_tag)
+                new_tag = soup.new_tag("div")
+                for index in range(0, len(event.file.services)):
+                    new_tr_tag = soup.new_tag("tr")
+                    for variable in [
+                        "service_id",
+                        "service_txt",
+                        "num_hours",
+                        "amount",
+                    ]:
+                        new_td_tag = soup.new_tag("td")
+                        new_td_tag.string = "{{" + variable + str(index) + "}}"
+                        new_tr_tag.append(new_td_tag)
+                    new_tag.append(new_tr_tag)
+                for comment in soup.find_all(string=lambda e: isinstance(e, bs4.Comment)):
+                    if "items" in comment:
+                        comment.replace_with(new_tag)
 
-            with open(output_html_path, "w") as file:
-                file.write(str(soup))
+                with open(output_html_path, "w") as file:
+                    file.write(str(soup))
 
-            log.info(
-                "Customer {} - Adding pdf data - fun: build_pdf".format(
-                    event.current_user_id
+                log.debug(
+                    "Preparing PDF template data",
+                    extra={
+                        "customer_id": event.current_user_id,
+                        "invoice_id": event.invoice.id,
+                        "file_id": event.file.id,
+                        "template": event.html_template_name,
+                        "event": "build_pdf",
+                    },
                 )
-            )
-            top_info_data = {}
-            top_info = crud.get_topinfos(
-                db=connection, current_user_id=event.current_user_id
-            )
-            if len(top_info) > 0:
-                top_info = top_info[0]
-                top_info_data["top_info_from"] = top_info.ti_from
-                top_info_data["top_info_addr"] = top_info.addr
-                top_info_data["top_info_phone"] = top_info.phone
-                top_info_data["top_info_email"] = top_info.email
+                top_info_data = {}
+                top_info = crud.get_topinfos(
+                    db=connection, current_user_id=event.current_user_id
+                )
+                if len(top_info) > 0:
+                    top_info = top_info[0]
+                    top_info_data["top_info_from"] = top_info.ti_from
+                    top_info_data["top_info_addr"] = top_info.addr
+                    top_info_data["top_info_phone"] = top_info.phone
+                    top_info_data["top_info_email"] = top_info.email
 
-            bill_to_data = {}
-            if event.file.bill_to:
-                bill_to_data["to"] = event.file.bill_to.to
-                bill_to_data["addr"] = event.file.bill_to.addr
-                bill_to_data["phone"] = event.file.bill_to.phone
-                bill_to_data["email"] = event.file.bill_to.email
+                bill_to_data = {}
+                if event.file.bill_to:
+                    bill_to_data["to"] = event.file.bill_to.to
+                    bill_to_data["addr"] = event.file.bill_to.addr
+                    bill_to_data["phone"] = event.file.bill_to.phone
+                    bill_to_data["email"] = event.file.bill_to.email
 
-            service_data = {}
-            subtotal = 0
-            index = 0
-            service_info = None
-            # Contratos enviados sin archivo
-            for service in event.file.services:
+                service_data = {}
+                subtotal = 0
+                index = 0
+                service_info = None
+                # Contratos enviados sin archivo
+                for service in event.file.services:
+                    if not service_info:
+                        service_info = service
+                    service_data["service_id{}".format(index)] = index + 1
+                    service_data["service_txt{}".format(index)] = service.title
+                    service_data["num_hours{}".format(index)] = service.hours
+                    service_data["amount{}".format(index)] = service.amount
+                    subtotal += service.amount
+                    index += 1
+
+                if event.invoice.with_taxes:
+                    total_tax_1 = (event.invoice.tax_1 / 100) * subtotal
+                    total_tax_2 = (event.invoice.tax_2 / 100) * subtotal
+                    total = total_tax_1 + total_tax_2 + subtotal
+                else:
+                    total = subtotal
+
+                title_company = "-"
+                empresa_variable = crud.get_global(
+                    db=connection, identifier=3, current_user_id=event.current_user_id
+                )
+                if empresa_variable:
+                    title_company = empresa_variable.value
+
+                variables = crud.get_globals(
+                    db=connection, current_user_id=event.current_user_id
+                )
+                tps_name = "TPS -"
+                tvq_name = "TVQ -"
+                for variable in variables:
+                    if variable.identifier == 1:
+                        tps_name = variable.name
+                    elif variable.identifier == 2:
+                        tvq_name = variable.name
+
+                context = {
+                    "title_company": title_company,
+                    "invoice_date": event.invoice.created.strftime("%d-%m-%Y"),
+                    "invoice_id": event.invoice.number_id,
+                    "created": event.invoice.created,
+                    "total": round(total, 2),
+                }
+
+                if event.invoice.with_taxes:
+                    context["tps_name"] = tps_name
+                    context["tvq_name"] = tvq_name
+                    context["total_no_taxes"] = round(subtotal, 2)
+                    context["total_tax1"] = round(total_tax_1, 2)
+                    context["total_tax2"] = round(total_tax_2, 2)
+
+                context |= bill_to_data
+                context |= service_data
+                context |= top_info_data
+
+                log.info(
+                    "Rendering PDF template",
+                    extra={
+                        "customer_id": event.current_user_id,
+                        "invoice_id": event.invoice.id,
+                        "file_id": event.file.id,
+                        "template": event.html_template_name,
+                        "event": "build_pdf",
+                    },
+                )
+                template_loader = jinja2.FileSystemLoader(os.path.join(base, "templates"))
+                template_env = jinja2.Environment(loader=template_loader)
+
+                template = template_env.get_template(event.html_template_name)
+                output_text = template.render(context)
+
                 if not service_info:
-                    service_info = service
-                service_data["service_id{}".format(index)] = index + 1
-                service_data["service_txt{}".format(index)] = service.title
-                service_data["num_hours{}".format(index)] = service.hours
-                service_data["amount{}".format(index)] = service.amount
-                subtotal += service.amount
-                index += 1
+                    searched_file = crud.get_file(
+                        db=connection,
+                        model_id=event.file.id,
+                        current_user_id=event.current_user_id,
+                    )
+                    if searched_file and len(searched_file.services) > 0:
+                        service_info = searched_file.services[0]
+                filename = f"facture_{event.invoice.number_id}_{service_info.title}_{event.invoice.created.strftime('%m_%Y')}-{str(uuid4())}.pdf"
+                filename = filename.replace(" ", "_")
+                output_pdf_path: str = "temp/pdf/{}".format(filename)
+                config = pdfkit.configuration(
+                    wkhtmltopdf=WKHTMLTOPDF_PATH
+                )  # TODO: Modificar en la máquina
+                pdfkit.from_string(output_text, output_pdf_path, configuration=config)
 
-            if event.invoice.with_taxes:
-                total_tax_1 = (event.invoice.tax_1 / 100) * subtotal
-                total_tax_2 = (event.invoice.tax_2 / 100) * subtotal
-                total = total_tax_1 + total_tax_2 + subtotal
-            else:
-                total = subtotal
-
-            title_company = "-"
-            empresa_variable = crud.get_global(
-                db=connection, identifier=3, current_user_id=event.current_user_id
-            )
-            if empresa_variable:
-                title_company = empresa_variable.value
-
-            variables = crud.get_globals(
-                db=connection, current_user_id=event.current_user_id
-            )
-            tps_name = "TPS -"
-            tvq_name = "TVQ -"
-            for variable in variables:
-                if variable.identifier == 1:
-                    tps_name = variable.name
-                elif variable.identifier == 2:
-                    tvq_name = variable.name
-
-            context = {
-                "title_company": title_company,
-                "invoice_date": event.invoice.created.strftime("%d-%m-%Y"),
-                "invoice_id": event.invoice.number_id,
-                "created": event.invoice.created,
-                "total": round(total, 2),
-            }
-
-            if event.invoice.with_taxes:
-                context["tps_name"] = tps_name
-                context["tvq_name"] = tvq_name
-                context["total_no_taxes"] = round(subtotal, 2)
-                context["total_tax1"] = round(total_tax_1, 2)
-                context["total_tax2"] = round(total_tax_2, 2)
-
-            context |= bill_to_data
-            context |= service_data
-            context |= top_info_data
-
-            log.info(
-                "Customer {} - Creating pdf - fun: build_pdf".format(
-                    event.current_user_id
+                if event.with_file:
+                    data_event = GenerateFinalPDFWithFile(
+                        current_user_id=event.current_user_id,
+                        pdf_tables=f"temp/pdf_tables_{event.current_user_id}.pdf",
+                        xlsx_url=event.xlsx_url,
+                        pdf_invoice=output_pdf_path,
+                        filename=filename,
+                        file_id=event.file.id,
+                        with_tables=event.invoice.with_tables,
+                        pages=event.pages,
+                    )
+                else:
+                    data_event = GenerateFinalPDFNoFile(
+                        current_user_id=event.current_user_id,
+                        pdf_invoice=output_pdf_path,
+                        filename=filename,
+                        file_id=event.file.id,
+                    )
+                log.info(
+                    "Publishing final PDF event",
+                    extra={
+                        "customer_id": event.current_user_id,
+                        "invoice_id": event.invoice.id,
+                        "file_id": event.file.id,
+                        "event": "build_pdf",
+                    },
                 )
-            )
-            template_loader = jinja2.FileSystemLoader(os.path.join(base, "templates"))
-            template_env = jinja2.Environment(loader=template_loader)
-
-            template = template_env.get_template(event.html_template_name)
-            output_text = template.render(context)
-
-            if not service_info:
-                searched_file = crud.get_file(
-                    db=connection,
-                    model_id=event.file.id,
-                    current_user_id=event.current_user_id,
-                )
-                if searched_file and len(searched_file.services) > 0:
-                    service_info = searched_file.services[0]
-            filename = f"facture_{event.invoice.number_id}_{service_info.title}_{event.invoice.created.strftime('%m_%Y')}-{str(uuid4())}.pdf"
-            filename = filename.replace(" ", "_")
-            output_pdf_path: str = "temp/pdf/{}".format(filename)
-            config = pdfkit.configuration(
-                wkhtmltopdf=WKHTMLTOPDF_PATH
-            )  # TODO: Modificar en la máquina
-            pdfkit.from_string(output_text, output_pdf_path, configuration=config)
-
-            if event.with_file:
-                data_event = GenerateFinalPDFWithFile(
-                    current_user_id=event.current_user_id,
-                    pdf_tables=f"temp/pdf_tables_{event.current_user_id}.pdf",
-                    xlsx_url=event.xlsx_url,
-                    pdf_invoice=output_pdf_path,
-                    filename=filename,
-                    file_id=event.file.id,
-                    with_tables=event.invoice.with_tables,
-                    pages=event.pages,
-                )
-            else:
-                data_event = GenerateFinalPDFNoFile(
-                    current_user_id=event.current_user_id,
-                    pdf_invoice=output_pdf_path,
-                    filename=filename,
-                    file_id=event.file.id,
-                )
-            log.info(
-                "Customer {} - Publishing GenerateFinalPDF event - fun: build_pdf".format(
-                    event.current_user_id
-                )
-            )
-            await publish(data_event)
-            return True
-    except Exception as e:
-        log.error("Customer {} - Failure building pdf".format(event.current_user_id))
-        log.error(e)
+                await publish(data_event)
+                return True
+    except Exception:
+        log.exception(
+            "Failed to build PDF",
+            extra={
+                "customer_id": event.current_user_id,
+                "invoice_id": event.invoice.id if event.invoice else None,
+                "file_id": event.file.id if event.file else None,
+                "event": "build_pdf",
+            },
+        )
         raise
 
 
 def generate_invoice(event: GenerateFinalPDFWithFile):
     log.info(
-        "Customer {} - Building invoice - fun: generate_invoice".format(
-            event.current_user_id
-        )
+        "Generating final invoice PDF",
+        extra={
+            "customer_id": event.current_user_id,
+            "file_id": event.file_id,
+            "with_tables": event.with_tables,
+            "event": "generate_invoice",
+        },
     )
     try:
         paths_to_check = [event.path_pdf_invoice]
@@ -303,9 +356,12 @@ def generate_invoice(event: GenerateFinalPDFWithFile):
         merger.close()
 
         log.info(
-            "Customer {} - Uploading invoice - fun: generate_invoice".format(
-                event.current_user_id
-            )
+            "Uploading invoice PDF to S3",
+            extra={
+                "customer_id": event.current_user_id,
+                "file_id": event.file_id,
+                "event": "generate_invoice",
+            },
         )
         s3_pdf_url = upload_file(
             file_path=event.path_pdf_invoice,
@@ -313,38 +369,55 @@ def generate_invoice(event: GenerateFinalPDFWithFile):
             is_pdf=True,
             bucket=S3_BUCKET_NAME,
         )
-        conn = next(get_db())
-        crud.patch_file(
-            db=conn,
-            model_id=event.file_id,
-            update_dict={"s3_pdf_url": s3_pdf_url},
-            current_user_id=event.current_user_id,
-        )
-        log.info(
-            "Customer {} - Invoice generated - fun: generate_invoice".format(
-                event.current_user_id
+        with get_db_context() as conn:
+            crud.patch_file(
+                db=conn,
+                model_id=event.file_id,
+                update_dict={"s3_pdf_url": s3_pdf_url},
+                current_user_id=event.current_user_id,
             )
+        log.info(
+            "Invoice PDF generated",
+            extra={
+                "customer_id": event.current_user_id,
+                "file_id": event.file_id,
+                "event": "generate_invoice",
+            },
         )
         return True
-    except Exception as e:
-        log.error(
-            "Customer {} - Failure generating invoice".format(event.current_user_id)
+    except Exception:
+        log.exception(
+            "Failed to generate invoice PDF",
+            extra={
+                "customer_id": event.current_user_id,
+                "file_id": event.file_id,
+                "event": "generate_invoice",
+            },
         )
-        log.error(e)
         raise
+    """finally:
+        remove_file(event.path_pdf_invoice)
+        if event.with_tables:
+            remove_file(event.path_pdf_tables)"""
 
 
 def generate_invoice_no_file(event: GenerateFinalPDFNoFile):
     log.info(
-        "Customer {} - Building invoice - fun: generate_invoice_no_file".format(
-            event.current_user_id
-        )
+        "Generating invoice PDF without xlsx",
+        extra={
+            "customer_id": event.current_user_id,
+            "file_id": event.file_id,
+            "event": "generate_invoice_no_file",
+        },
     )
     try:
         log.info(
-            "Customer {} - Uploading invoice - fun: generate_invoice_no_file".format(
-                event.current_user_id
-            )
+            "Uploading invoice PDF to S3",
+            extra={
+                "customer_id": event.current_user_id,
+                "file_id": event.file_id,
+                "event": "generate_invoice_no_file",
+            },
         )
         s3_pdf_url = upload_file(
             file_path=event.path_pdf_invoice,
@@ -352,22 +425,31 @@ def generate_invoice_no_file(event: GenerateFinalPDFNoFile):
             is_pdf=True,
             bucket=S3_BUCKET_NAME,
         )
-        conn = next(get_db())
-        crud.patch_file(
-            db=conn,
-            model_id=event.file_id,
-            update_dict={"s3_pdf_url": s3_pdf_url},
-            current_user_id=event.current_user_id,
-        )
-        log.info(
-            "Customer {} - Invoice generated - fun: generate_invoice_no_file".format(
-                event.current_user_id
+        with get_db_context() as conn:
+            crud.patch_file(
+                db=conn,
+                model_id=event.file_id,
+                update_dict={"s3_pdf_url": s3_pdf_url},
+                current_user_id=event.current_user_id,
             )
+        log.info(
+            "Invoice PDF generated",
+            extra={
+                "customer_id": event.current_user_id,
+                "file_id": event.file_id,
+                "event": "generate_invoice_no_file",
+            },
         )
         return True
-    except Exception as e:
-        log.error(
-            "Customer {} - Failure generating invoice".format(event.current_user_id)
+    except Exception:
+        log.exception(
+            "Failed to generate invoice PDF without xlsx",
+            extra={
+                "customer_id": event.current_user_id,
+                "file_id": event.file_id,
+                "event": "generate_invoice_no_file",
+            },
         )
-        log.error(e)
         raise
+    #finally:
+    #    remove_file(event.path_pdf_invoice)
