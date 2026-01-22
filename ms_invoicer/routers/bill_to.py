@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -13,7 +15,7 @@ def create_bill_to(
     model: schemas.BillToBase,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.BillTo:
     obj_dict = model.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_billto(db=db, model=schemas.BillToCreate(**obj_dict))
@@ -25,7 +27,7 @@ def get_billtos(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-):
+) -> list[schemas.BillTo]:
     return crud.get_billtos(
         db=db, current_user_id=current_user.id, skip=skip, limit=limit
     )
@@ -37,7 +39,7 @@ def update_billTo(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[schemas.BillTo]:
     update_dict = model.model_dump(exclude_unset=True)
     result = crud.patch_billto(
         db=db,
@@ -58,5 +60,5 @@ def delete_bill_to(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> int:
     return crud.patch_billto(db=db, model_id=model_id, current_user_id=current_user.id, update_dict={"user_id": None})

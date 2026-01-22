@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Optional, Union
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
@@ -17,7 +17,7 @@ def post_invoice(
     invoice: schemas.InvoiceBase,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.InvoiceLite:
     result = crud.get_invoices_by_number_id(
         db=db,
         number_id=invoice.number_id,
@@ -40,7 +40,7 @@ def patch_invoice(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[schemas.Invoice]:
     update_dict = model_update.model_dump(exclude_unset=True)
     if "number_id" in update_dict and not isinstance(
         update_dict.get("number_id", None), int
@@ -68,7 +68,7 @@ def get_invoice(
     invoice_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[schemas.Invoice]:
     return crud.get_invoice(db=db, model_id=invoice_id, current_user_id=current_user.id)
 
 
@@ -76,7 +76,7 @@ def get_invoice(
 def get_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> List[schemas.Invoice]:
     return crud.get_invoices(db=db, current_user_id=current_user.id)
 
 
@@ -85,7 +85,7 @@ def delete_invoice(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> int:
     files = crud.get_files_by_invoice(
         db=db, model_id=model_id, current_user_id=current_user.id
     )

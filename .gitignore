@@ -67,8 +67,9 @@ venv/
 temp/
 *.pem
 no_upload_helper.py
-no_upload_helper_copy.py
+no_upload_helper2.py
 *.sql
+teo_10_*
 
 # Ignore dynaconf secret files
 .secrets.*

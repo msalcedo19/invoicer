@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, func
@@ -8,7 +8,7 @@ from ms_invoicer.sql_app import models, schemas
 
 
 # Template ----------------------------------------------------------
-def get_templates(db: Session, current_user_id: int):
+def get_templates(db: Session, current_user_id: int) -> List[models.Template]:
     return (
         db.query(models.Template)
         .filter(models.Template.user_id == current_user_id)
@@ -16,7 +16,7 @@ def get_templates(db: Session, current_user_id: int):
     )
 
 
-def get_template(db: Session, current_user_id: int):
+def get_template(db: Session, current_user_id: int) -> Optional[models.Template]:
     return (
         db.query(models.Template)
         .filter(
@@ -26,7 +26,7 @@ def get_template(db: Session, current_user_id: int):
     )
 
 
-def create_template(db: Session, model: schemas.TemplateCreate):
+def create_template(db: Session, model: schemas.TemplateCreate) -> models.Template:
     db_model = models.Template(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -35,13 +35,15 @@ def create_template(db: Session, model: schemas.TemplateCreate):
 
 
 # TopInfo ----------------------------------------------------------
-def get_topinfos(db: Session, current_user_id: int):
+def get_topinfos(db: Session, current_user_id: int) -> List[models.TopInfo]:
     return (
         db.query(models.TopInfo).filter(models.TopInfo.user_id == current_user_id).all()
     )
 
 
-def patch_topinfo(db: Session, model_id: int, current_user_id: int, update_dict: dict):
+def patch_topinfo(
+    db: Session, model_id: int, current_user_id: int, update_dict: dict
+) -> int:
     result = (
         db.query(models.TopInfo)
         .filter(
@@ -53,7 +55,7 @@ def patch_topinfo(db: Session, model_id: int, current_user_id: int, update_dict:
     return result
 
 
-def create_topinfo(db: Session, model: schemas.TopInfoCreate):
+def create_topinfo(db: Session, model: schemas.TopInfoCreate) -> models.TopInfo:
     db_model = models.TopInfo(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -62,7 +64,7 @@ def create_topinfo(db: Session, model: schemas.TopInfoCreate):
 
 
 # Globals ----------------------------------------------------------
-def get_global(db: Session, identifier: int, current_user_id: int):
+def get_global(db: Session, identifier: int, current_user_id: int) -> Optional[models.Globals]:
     return (
         db.query(models.Globals)
         .filter(
@@ -73,7 +75,9 @@ def get_global(db: Session, identifier: int, current_user_id: int):
     )
 
 
-def get_global_by_id(db: Session, model_id: str, current_user_id: int):
+def get_global_by_id(
+    db: Session, model_id: str, current_user_id: int
+) -> Optional[models.Globals]:
     return (
         db.query(models.Globals)
         .filter(
@@ -83,13 +87,15 @@ def get_global_by_id(db: Session, model_id: str, current_user_id: int):
     )
 
 
-def get_globals(db: Session, current_user_id: int):
+def get_globals(db: Session, current_user_id: int) -> List[models.Globals]:
     return (
         db.query(models.Globals).filter(models.Globals.user_id == current_user_id).all()
     )
 
 
-def patch_global(db: Session, model_id: int, current_user_id: int, update_dict: dict):
+def patch_global(
+    db: Session, model_id: int, current_user_id: int, update_dict: dict
+) -> int:
     result = (
         db.query(models.Globals)
         .filter(
@@ -101,7 +107,7 @@ def patch_global(db: Session, model_id: int, current_user_id: int, update_dict: 
     return result
 
 
-def create_global(db: Session, model: schemas.GlobalCreate):
+def create_global(db: Session, model: schemas.GlobalCreate) -> models.Globals:
     db_model = models.Globals(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -110,7 +116,7 @@ def create_global(db: Session, model: schemas.GlobalCreate):
 
 
 # Customer ----------------------------------------------------------
-def get_customer(db: Session, model_id: int, current_user_id: int):
+def get_customer(db: Session, model_id: int, current_user_id: int) -> Dict[str, Any]:
     invoice_count_subquery = (
         db.query(
             models.Invoice.customer_id,
@@ -141,7 +147,7 @@ def get_customer(db: Session, model_id: int, current_user_id: int):
 
 def get_customers(
     db: Session, current_user_id: int, skip: int = 0, limit: int = 1000
-) -> List[models.Customer]:
+) -> List[Dict[str, Any]]:
     # Define the subquery for counting invoices
     invoice_count_subquery = (
         db.query(
@@ -190,7 +196,9 @@ def get_all_customers(
     return db.query(models.Customer).offset(skip).limit(limit).all()
 
 
-def patch_customer(db: Session, model_id: int, current_user_id: int, update_dict: dict):
+def patch_customer(
+    db: Session, model_id: int, current_user_id: int, update_dict: dict
+) -> int:
     result = (
         db.query(models.Customer)
         .filter(
@@ -202,7 +210,9 @@ def patch_customer(db: Session, model_id: int, current_user_id: int, update_dict
     return result
 
 
-def patch_all_customer_by_user_id(db: Session, user_id: int, update_dict: dict):
+def patch_all_customer_by_user_id(
+    db: Session, user_id: int, update_dict: dict
+) -> int:
     result = (
         db.query(models.Customer)
         .filter(models.Customer.user_id == user_id)
@@ -212,7 +222,7 @@ def patch_all_customer_by_user_id(db: Session, user_id: int, update_dict: dict):
     return result
 
 
-def delete_customer(db: Session, model_id: int, current_user_id: int):
+def delete_customer(db: Session, model_id: int, current_user_id: int) -> int:
     result = (
         db.query(models.Customer)
         .filter(
@@ -224,7 +234,7 @@ def delete_customer(db: Session, model_id: int, current_user_id: int):
     return result
 
 
-def create_customer(db: Session, model: schemas.CustomerCreate):
+def create_customer(db: Session, model: schemas.CustomerCreate) -> Dict[str, Any]:
     db_model = models.Customer(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -233,7 +243,7 @@ def create_customer(db: Session, model: schemas.CustomerCreate):
 
 
 # File ----------------------------------------------------------
-def get_file(db: Session, model_id: int, current_user_id: int):
+def get_file(db: Session, model_id: int, current_user_id: int) -> Optional[models.File]:
     return (
         db.query(models.File)
         .filter(models.File.id == model_id, models.File.user_id == current_user_id)
@@ -241,7 +251,9 @@ def get_file(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def get_file_with_relations(db: Session, model_id: int, current_user_id: int):
+def get_file_with_relations(
+    db: Session, model_id: int, current_user_id: int
+) -> Optional[models.File]:
     return (
         db.query(models.File)
         .options(
@@ -254,7 +266,9 @@ def get_file_with_relations(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def get_files(db: Session, current_user_id: int, skip: int = 0, limit: int = 100):
+def get_files(
+    db: Session, current_user_id: int, skip: int = 0, limit: int = 100
+) -> List[models.File]:
     return (
         db.query(models.File)
         .filter(models.File.user_id == current_user_id)
@@ -264,7 +278,9 @@ def get_files(db: Session, current_user_id: int, skip: int = 0, limit: int = 100
     )
 
 
-def get_files_by_invoice(db: Session, model_id: int, current_user_id: int):
+def get_files_by_invoice(
+    db: Session, model_id: int, current_user_id: int
+) -> List[models.File]:
     return (
         db.query(models.File)
         .filter(
@@ -275,7 +291,9 @@ def get_files_by_invoice(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def patch_file(db: Session, model_id: int, current_user_id: int, update_dict: dict):
+def patch_file(
+    db: Session, model_id: int, current_user_id: int, update_dict: dict
+) -> int:
     result = (
         db.query(models.File)
         .filter(models.File.id == model_id, models.File.user_id == current_user_id)
@@ -287,7 +305,7 @@ def patch_file(db: Session, model_id: int, current_user_id: int, update_dict: di
 
 def patch_all_files_by_invoice_user_id(
     db: Session, user_id: int, invoice_id: int, update_dict: dict
-):
+) -> int:
     result = (
         db.query(models.File)
         .filter(models.File.user_id == user_id, models.File.invoice_id == invoice_id)
@@ -297,7 +315,7 @@ def patch_all_files_by_invoice_user_id(
     return result
 
 
-def delete_file(db: Session, model_id: int, current_user_id: int):
+def delete_file(db: Session, model_id: int, current_user_id: int) -> int:
     result = (
         db.query(models.File)
         .filter(models.File.id == model_id, models.File.user_id == current_user_id)
@@ -307,7 +325,7 @@ def delete_file(db: Session, model_id: int, current_user_id: int):
     return result
 
 
-def delete_files_by_invoice(db: Session, model_id: int, current_user_id: int):
+def delete_files_by_invoice(db: Session, model_id: int, current_user_id: int) -> int:
     return (
         db.query(models.File)
         .filter(
@@ -317,7 +335,7 @@ def delete_files_by_invoice(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def create_file(db: Session, model: schemas.FileCreate):
+def create_file(db: Session, model: schemas.FileCreate) -> models.File:
     db_model = models.File(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -326,7 +344,9 @@ def create_file(db: Session, model: schemas.FileCreate):
 
 
 # Bill_to ----------------------------------------------------------
-def get_billto(db: Session, model_id: int, current_user_id: int):
+def get_billto(
+    db: Session, model_id: int, current_user_id: int
+) -> Optional[models.BillTo]:
     return (
         db.query(models.BillTo)
         .filter(models.BillTo.id == model_id, models.BillTo.user_id == current_user_id)
@@ -334,7 +354,9 @@ def get_billto(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def get_billtos(db: Session, current_user_id: int, skip: int = 0, limit: int = 100):
+def get_billtos(
+    db: Session, current_user_id: int, skip: int = 0, limit: int = 100
+) -> List[models.BillTo]:
     return (
         db.query(models.BillTo)
         .filter(models.BillTo.user_id == current_user_id)
@@ -344,11 +366,13 @@ def get_billtos(db: Session, current_user_id: int, skip: int = 0, limit: int = 1
     )
 
 
-def get_billtos_no_user(db: Session, skip: int = 0, limit: int = 100):
+def get_billtos_no_user(db: Session, skip: int = 0, limit: int = 100) -> List[models.BillTo]:
     return db.query(models.BillTo).offset(skip).limit(limit).all()
 
 
-def patch_billto(db: Session, model_id: int, current_user_id: int, update_dict: dict):
+def patch_billto(
+    db: Session, model_id: int, current_user_id: int, update_dict: dict
+) -> int:
     result = (
         db.query(models.BillTo)
         .filter(models.BillTo.id == model_id, models.BillTo.user_id == current_user_id)
@@ -359,7 +383,7 @@ def patch_billto(db: Session, model_id: int, current_user_id: int, update_dict: 
     return result
 
 
-def delete_billto(db: Session, model_id: int, current_user_id: int):
+def delete_billto(db: Session, model_id: int, current_user_id: int) -> int:
     result = (
         db.query(models.BillTo)
         .filter(models.BillTo.id == model_id, models.BillTo.user_id == current_user_id)
@@ -369,7 +393,7 @@ def delete_billto(db: Session, model_id: int, current_user_id: int):
     return result
 
 
-def create_billto(db: Session, model: schemas.BillToCreate):
+def create_billto(db: Session, model: schemas.BillToCreate) -> models.BillTo:
     db_model = models.BillTo(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -378,7 +402,9 @@ def create_billto(db: Session, model: schemas.BillToCreate):
 
 
 # Service ----------------------------------------------------------
-def get_service(db: Session, model_id: int, current_user_id: int):
+def get_service(
+    db: Session, model_id: int, current_user_id: int
+) -> Optional[models.Service]:
     return (
         db.query(models.Service)
         .filter(
@@ -388,7 +414,9 @@ def get_service(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def get_services(db: Session, current_user_id: int, skip: int = 0, limit: int = 100):
+def get_services(
+    db: Session, current_user_id: int, skip: int = 0, limit: int = 100
+) -> List[models.Service]:
     return (
         db.query(models.Service)
         .filter(models.Service.user_id == current_user_id)
@@ -398,7 +426,9 @@ def get_services(db: Session, current_user_id: int, skip: int = 0, limit: int = 
     )
 
 
-def patch_service(db: Session, model_id: int, current_user_id: int, update_dict: dict):
+def patch_service(
+    db: Session, model_id: int, current_user_id: int, update_dict: dict
+) -> int:
     return (
         db.query(models.Service)
         .filter(
@@ -408,7 +438,7 @@ def patch_service(db: Session, model_id: int, current_user_id: int, update_dict:
     )
 
 
-def delete_services_by_file(db: Session, model_id: int, current_user_id: int):
+def delete_services_by_file(db: Session, model_id: int, current_user_id: int) -> int:
     return (
         db.query(models.Service)
         .filter(
@@ -419,7 +449,7 @@ def delete_services_by_file(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def delete_service(db: Session, model_id: int, current_user_id: int):
+def delete_service(db: Session, model_id: int, current_user_id: int) -> int:
     return (
         db.query(models.Service)
         .filter(
@@ -429,7 +459,7 @@ def delete_service(db: Session, model_id: int, current_user_id: int):
     )
 
 
-def create_service(db: Session, model: schemas.ServiceCreate):
+def create_service(db: Session, model: schemas.ServiceCreate) -> models.Service:
     db_model = models.Service(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -438,7 +468,9 @@ def create_service(db: Session, model: schemas.ServiceCreate):
 
 
 # Invoice ----------------------------------------------------------
-def get_invoice(db: Session, model_id: int, current_user_id: int):
+def get_invoice(
+    db: Session, model_id: int, current_user_id: int
+) -> Optional[models.Invoice]:
     return (
         db.query(models.Invoice)
         .filter(
@@ -450,7 +482,7 @@ def get_invoice(db: Session, model_id: int, current_user_id: int):
 
 def get_invoices_by_customer(
     db: Session, model_id: int, current_user_id: int, skip: int, limit: int = 1000
-):
+) -> List[models.Invoice]:
     query_results = (
         db.query(models.Invoice)
         .filter(
@@ -485,7 +517,7 @@ def get_invoices_by_customer_and_date_range(
     current_user_id: int,
     start_date: datetime,
     end_date: datetime,
-):
+) -> List[models.Invoice]:
     return (
         db.query(models.Invoice)
         .filter(
@@ -499,7 +531,7 @@ def get_invoices_by_customer_and_date_range(
 
 def get_invoices_by_number_id(
     db: Session, number_id: int, customer_id: int, current_user_id: int
-):
+) -> Optional[models.Invoice]:
     return (
         db.query(models.Invoice)
         .filter(
@@ -511,7 +543,9 @@ def get_invoices_by_number_id(
     )
 
 
-def get_invoices(db: Session, current_user_id: int, skip: int = 0, limit: int = 100):
+def get_invoices(
+    db: Session, current_user_id: int, skip: int = 0, limit: int = 100
+) -> List[models.Invoice]:
     return (
         db.query(models.Invoice)
         .order_by(desc(models.Invoice.number_id))
@@ -522,7 +556,9 @@ def get_invoices(db: Session, current_user_id: int, skip: int = 0, limit: int = 
     )
 
 
-def patch_invoice(db: Session, model_id: int, current_user_id: int, update_dict: dict):
+def patch_invoice(
+    db: Session, model_id: int, current_user_id: int, update_dict: dict
+) -> int:
     result = (
         db.query(models.Invoice)
         .filter(
@@ -536,7 +572,7 @@ def patch_invoice(db: Session, model_id: int, current_user_id: int, update_dict:
 
 def patch_all_invoice_by_customer_user_id(
     db: Session, customer_id: int, user_id: int, update_dict: dict
-):
+) -> int:
     result = (
         db.query(models.Invoice)
         .filter(
@@ -548,7 +584,7 @@ def patch_all_invoice_by_customer_user_id(
     return result
 
 
-def delete_invoice(db: Session, model_id: int, current_user_id: int):
+def delete_invoice(db: Session, model_id: int, current_user_id: int) -> None:
     result = (
         db.query(models.Invoice)
         .filter(
@@ -560,7 +596,7 @@ def delete_invoice(db: Session, model_id: int, current_user_id: int):
     db.commit()
 
 
-def delete_invoices_by_customer(db: Session, model_id: int, current_user_id: int):
+def delete_invoices_by_customer(db: Session, model_id: int, current_user_id: int) -> int:
     return (
         db.query(models.Invoice)
         .filter(
@@ -571,7 +607,7 @@ def delete_invoices_by_customer(db: Session, model_id: int, current_user_id: int
     )
 
 
-def create_invoice(db: Session, model: schemas.InvoiceCreate):
+def create_invoice(db: Session, model: schemas.InvoiceCreate) -> models.Invoice:
     db_model = models.Invoice(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -580,7 +616,7 @@ def create_invoice(db: Session, model: schemas.InvoiceCreate):
 
 
 # User -----------------------------------
-def create_user(db: Session, model: schemas.UserCreate):
+def create_user(db: Session, model: schemas.UserCreate) -> models.User:
     db_model = models.User(**model.model_dump())
     db.add(db_model)
     db.commit()
@@ -588,15 +624,15 @@ def create_user(db: Session, model: schemas.UserCreate):
     return db_model
 
 
-def get_user_by_username(db: Session, username: str):
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
     return db.query(models.User).filter(models.User.username == username).first()
 
 
-def get_users(db: Session):
+def get_users(db: Session) -> List[models.User]:
     return db.query(models.User).all()
 
 
-def delete_user(db: Session, model_id: int):
+def delete_user(db: Session, model_id: int) -> None:
     result = (
         db.query(models.User)
         .filter(

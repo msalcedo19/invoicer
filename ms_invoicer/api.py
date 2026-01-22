@@ -1,8 +1,8 @@
 import logging
 import time
-from typing import List
+from typing import Any, Awaitable, Callable, List, Optional
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -46,7 +46,9 @@ def startup_tasks():
 
 
 @api.middleware("http")
-async def add_process_time_header(request: Request, call_next):
+async def add_process_time_header(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
@@ -64,7 +66,7 @@ async def add_process_time_header(request: Request, call_next):
 
 
 @api.get("/")
-def api_status():
+def api_status() -> dict[str, str]:
     """Returns a detailed status of the service including all dependencies"""
     # TODO: Should replace this with database connection / service checks
     return {"status": "OK"}
@@ -74,7 +76,7 @@ def api_status():
 def get_services(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> List[schemas.Service]:
     return crud.get_services(db=db, current_user_id=current_user.id)
 
 
@@ -83,7 +85,7 @@ def post_service(
     contracts: List[schemas.ServiceCreate],
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> List[schemas.Service]:
     result = []
     for contract in contracts:
         obj_dict = contract.model_dump()
@@ -98,17 +100,17 @@ def post_service(
 def get_topinfos(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[schemas.TopInfo]:
     return crud.get_topinfos(db=db, current_user_id=current_user.id)
 
 
 @api.patch("/topinfo/{model_id}", response_model=list[schemas.TopInfo])
 def update_topinfo(
-    model: dict,
+    model: dict[str, Any],
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[list[schemas.TopInfo]]:
     result = crud.patch_topinfo(
         db=db, model_id=model_id, current_user_id=current_user.id, update_dict=model
     )
@@ -122,5 +124,5 @@ def update_topinfo(
 def get_templates(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[schemas.Template]:
     return crud.get_templates(db=db, current_user_id=current_user.id)

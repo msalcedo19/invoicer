@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 import json
-from typing import Dict, Optional, Union, List
+from typing import Dict, List, Optional, Union
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, Form, UploadFile, status, HTTPException, Body
@@ -34,7 +34,7 @@ def get_file(
     file_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.File:
     return crud.get_file(db=db, model_id=file_id, current_user_id=current_user.id)
 
 
@@ -42,7 +42,7 @@ def get_file(
 def get_files(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[schemas.File]:
     return crud.get_files(db=db, current_user_id=current_user.id)
 
 
@@ -52,7 +52,7 @@ def patch_file(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[schemas.File]:
     update_dict = model_update.model_dump(exclude_unset=True)
     result = crud.patch_file(
         db=db,
@@ -71,7 +71,7 @@ def delete_file(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> int:
     file = crud.get_file(db=db, model_id=model_id, current_user_id=current_user.id)
     crud.delete_services_by_file(
         db=db, model_id=file.id, current_user_id=current_user.id
@@ -90,7 +90,7 @@ async def generate_summary(
     summary_request: SummaryRequest = Body(...),
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, str]:
     # Define the format of your date string
     date_format = "%Y-%m-%d"
 
@@ -113,7 +113,7 @@ async def generate_summary(
 async def get_pages(
     file: UploadFile = Form(),
     current_user: schemas.User = Depends(get_current_user)
-):
+) -> Dict[str, List[str]]:
     response = extract_pages(uploaded_file=file, current_user_id=current_user.id)
     return {"pages": response}
 
@@ -123,7 +123,7 @@ async def create_file(
     file: schemas.FileCreate,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.File:
     obj_dict = file.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_file(
@@ -144,7 +144,7 @@ async def generate_pdf(
     pages: str = Form(),
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.File:
     result = None
     new_invoice = None
 

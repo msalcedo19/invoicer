@@ -33,7 +33,7 @@ def _ensure_async(handler: Callable[..., Any]) -> EventHandlerType:
     if asyncio.iscoroutinefunction(handler):
         return cast(EventHandlerType, handler)
 
-    async def _wrapper(*args: Any, **kwargs: Any):
+    async def _wrapper(*args: Any, **kwargs: Any) -> Any:
         result = handler(*args, **kwargs)
         if inspect.isawaitable(result):
             return await result
@@ -42,7 +42,9 @@ def _ensure_async(handler: Callable[..., Any]) -> EventHandlerType:
     return cast(EventHandlerType, _wrapper)
 
 
-def unregister(event_type: Type, async_event_handler: Callable[..., Coroutine[Any, Event, Any]]):
+def unregister(
+    event_type: Type, async_event_handler: Callable[..., Coroutine[Any, Event, Any]]
+) -> None:
     """
     :event_type: the Class corresponding to the event type from which
         to unregister the given event handler (the class in question should
@@ -54,7 +56,7 @@ def unregister(event_type: Type, async_event_handler: Callable[..., Coroutine[An
 
 def register(
     event_type: Type, async_event_handler: Union[EventHandlerType, List[EventHandlerType]]
-):
+) -> None:
     """
     :event_type: the class corresponding to the event type to register
         an event handler with (the class in question should
@@ -70,7 +72,7 @@ def register(
         bus.on(_event_type(event_type), _ensure_async(async_event_handler))
 
 
-async def publish(event: Event):
+async def publish(event: Event) -> None:
     """
     :event: publishes the given event (internally dispatched to the registered handlers).
     """

@@ -4,7 +4,7 @@ from ms_invoicer.file_helpers import extract_data
 from ms_invoicer.invoice_helper import build_pdf, generate_invoice, generate_invoice_no_file
 
 
-def register_event_handlers():
+def register_event_handlers() -> None:
     """
     Entry-point for registering all event handlers with the event bus.
     """

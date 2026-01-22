@@ -1,4 +1,4 @@
-from typing import List, Union, Dict
+from typing import Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ router = APIRouter()
 async def get_customers(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.TotalAndCustomer:
     start = 0
     return schemas.TotalAndCustomer(
         total=crud.get_total_customers(db=db, current_user_id=current_user.id),
@@ -31,7 +31,7 @@ def get_customer(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[schemas.CustomerFull]:
     return crud.get_customer(db=db, model_id=model_id, current_user_id=current_user.id)
 
 
@@ -40,7 +40,7 @@ def get_customer_invoices(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.TotalAndInvoices:
     start = 0
     result =  schemas.TotalAndInvoices(
         total=crud.get_total_invoices_by_customer(
@@ -62,7 +62,7 @@ def patch_customer(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[schemas.Customer]:
     update_dict = model_update.model_dump(exclude_unset=True)
     result = crud.patch_customer(
         db=db,
@@ -83,7 +83,7 @@ def delete_customer(
     customer_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> int:
     invoices = crud.get_invoices_by_customer(
         db=db, model_id=customer_id, current_user_id=current_user.id, skip=0,
     )
@@ -119,7 +119,7 @@ def post_customer(
     customer: schemas.CustomerBase,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> schemas.Customer:
     obj_dict = customer.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_customer(db=db, model=schemas.CustomerCreate(**obj_dict))
@@ -131,7 +131,7 @@ async def get_all_customers(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-):
+) -> list[schemas.Customer]:
     return crud.get_all_customers(db=db, skip=skip, limit=limit)
 
 
@@ -141,7 +141,7 @@ def patch_invoice(
     new_user_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, int]:
     model_update = {"user_id": new_user_id}
 
     result = crud.patch_all_customer_by_user_id(

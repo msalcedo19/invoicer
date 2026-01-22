@@ -1,9 +1,12 @@
 from contextlib import contextmanager
+from typing import ContextManager, Generator
+
+from sqlalchemy.orm import Session
 
 from ms_invoicer.sql_app.database import SessionLocal
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
@@ -12,7 +15,7 @@ def get_db():
 
 
 @contextmanager
-def get_db_context():
+def get_db_context() -> ContextManager[Session]:
     db = SessionLocal()
     try:
         yield db

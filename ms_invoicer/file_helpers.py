@@ -68,7 +68,7 @@ async def process_file(
     current_user_id: int,
     col_letter: str = "F",
     pages: Union[List[str], None] = None,
-) -> schemas.File:
+) -> Tuple[Union[schemas.File, None], Union[str, None]]:
     if file is None:
         return None, None
     pages = pages or []
@@ -266,7 +266,7 @@ async def process_pdf(
     new_file_obj: schemas.File,
     xlsx_local_path: str,
     pages: Union[List[str], None] = None,
-):
+) -> schemas.File:
     pages = pages or []
     log.info(
         "Processing PDF creation",
@@ -371,7 +371,7 @@ async def generate_summary_by_date(
     current_user: User,
     start_date: datetime,
     end_date: datetime,
-):
+) -> str:
     log.info(
         "Generating summary by date",
         extra={

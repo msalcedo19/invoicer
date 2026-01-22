@@ -1,5 +1,5 @@
 import json
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 import logging
 import os
 import boto3
@@ -33,12 +33,12 @@ MONTH_NAMES_FRENCH = {
 
 
 class BreadCrumbs:
-    def __init__(self, href: str, value: str, required_id: int = None):
+    def __init__(self, href: str, value: str, required_id: Optional[int] = None) -> None:
         self.href = href
         self.value = value
         self.required_id = required_id
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return json.dumps({"href": self.href, "value": self.value, "required_id": self.required_id})
 
 
@@ -50,7 +50,7 @@ def check_dates(base_date: datetime, date1: time, date2: time = None) -> datetim
     return result
 
 
-def create_folders():
+def create_folders() -> None:
     folder_names = ["temp", "temp/xlsx", "temp/pdf", "temp/cache"]
     for folder_name in folder_names:
         if not os.path.exists(folder_name):
@@ -66,14 +66,14 @@ def create_folders():
             )
 
 
-def save_file(file_path: str, file: UploadFile):
+def save_file(file_path: str, file: UploadFile) -> None:
     if os.path.exists(file_path):
         os.remove(file_path)
     with open(file_path, "wb") as output_file:
         output_file.write(file.file.read())
 
 
-def remove_file(file_path: str):
+def remove_file(file_path: str) -> None:
     if os.path.isfile(file_path):
         os.remove(file_path)
     else:
@@ -83,7 +83,7 @@ def remove_file(file_path: str):
         )
 
 
-def find_ranges(sheet: Worksheet) -> List[tuple]:
+def find_ranges(sheet: Worksheet) -> List[Tuple[int, int, int, int]]:
     """
     This function takes an Excel worksheet (using the openpyxl library) as input,
     searches for a specific string in the first column of the sheet, and returns
@@ -133,7 +133,7 @@ def find_ranges(sheet: Worksheet) -> List[tuple]:
     return result
 
 
-def find_letter(sheet: Worksheet) -> List[tuple]:
+def find_letter(sheet: Worksheet) -> Optional[str]:
     result = None
     for row in sheet.iter_rows(max_col=10, max_row=200):
         row_data: Cell = row[0]
@@ -156,10 +156,10 @@ def find_letter(sheet: Worksheet) -> List[tuple]:
 def upload_file(
     file_path: str,
     file_name: str,
-    bucket="invoicer-dev-01",
-    object_name=None,
-    is_pdf=False,
-):
+    bucket: str = "invoicer-dev-01",
+    object_name: Optional[str] = None,
+    is_pdf: bool = False,
+) -> str:
     """Upload a file to an S3 bucket
 
     :param file_name: File to upload
@@ -222,8 +222,8 @@ def upload_file(
 def download_file_from_s3(
     file_path_s3: str,
     path_to_save: str,
-    bucket="invoicer-dev-01",
-):
+    bucket: str = "invoicer-dev-01",
+) -> None:
     try:
         session: boto3.Session = boto3.session.Session()
         s3 = session.client(
@@ -249,7 +249,9 @@ def download_file_from_s3(
         raise Exception("Failure downloading file")
 
 
-def delete_file_from_s3(file_names: Union[str, list], bucket_name="invoicer-dev-01"):
+def delete_file_from_s3(
+    file_names: Union[str, list[str]], bucket_name: str = "invoicer-dev-01"
+) -> None:
     try:
         # Create a session using your AWS credentials
         s3_client = boto3.client(

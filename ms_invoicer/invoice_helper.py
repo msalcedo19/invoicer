@@ -3,6 +3,7 @@ import bs4
 import jinja2
 import pdfkit
 import logging
+from typing import IO, Union
 
 from datetime import datetime
 from uuid import uuid4
@@ -17,12 +18,12 @@ except ImportError:  # pypdf>=5 removed PdfMerger
         def __init__(self) -> None:
             self._writer = PdfWriter()
 
-        def append(self, fileobj) -> None:
+        def append(self, fileobj: Union[str, bytes, os.PathLike[str], IO[bytes]]) -> None:
             reader = PdfReader(fileobj)
             for page in reader.pages:
                 self._writer.add_page(page)
 
-        def write(self, fileobj) -> None:
+        def write(self, fileobj: Union[str, bytes, os.PathLike[str], IO[bytes]]) -> None:
             if isinstance(fileobj, (str, bytes, os.PathLike)):
                 with open(os.fspath(fileobj), "wb") as handle:
                     self._writer.write(handle)
@@ -50,7 +51,7 @@ base = os.path.dirname(os.path.dirname(__file__))
 log = logging.getLogger(__name__)
 
 
-async def build_pdf(event: PdfToProcessEvent):
+async def build_pdf(event: PdfToProcessEvent) -> bool:
     try:
         log.info(
             "Building PDF from invoice data",
@@ -262,7 +263,7 @@ async def build_pdf(event: PdfToProcessEvent):
         raise
 
 
-def generate_invoice(event: GenerateFinalPDFWithFile):
+def generate_invoice(event: GenerateFinalPDFWithFile) -> bool:
     log.info(
         "Generating final invoice PDF",
         extra={
@@ -401,7 +402,7 @@ def generate_invoice(event: GenerateFinalPDFWithFile):
             remove_file(event.path_pdf_tables)"""
 
 
-def generate_invoice_no_file(event: GenerateFinalPDFNoFile):
+def generate_invoice_no_file(event: GenerateFinalPDFNoFile) -> bool:
     log.info(
         "Generating invoice PDF without xlsx",
         extra={

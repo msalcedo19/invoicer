@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -16,7 +17,7 @@ def get_global(
     identifier: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Optional[schemas.Global]:
     return crud.get_global(
         db=db, identifier=identifier, current_user_id=current_user.id
     )
@@ -26,7 +27,7 @@ def get_global(
 def get_globals(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[schemas.Global]:
     return crud.get_globals(db=db, current_user_id=current_user.id)
 
 
@@ -36,7 +37,7 @@ def update_global(
     model_id: int,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[schemas.Global]:
     model["updated"] = get_current_date()
     global_var = crud.get_global_by_id(
         db=db, model_id=model_id, current_user_id=current_user.id

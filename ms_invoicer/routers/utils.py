@@ -1,3 +1,5 @@
+from typing import Any, Dict, Union
+
 from fastapi import Depends, APIRouter
 from sqlalchemy.orm import Session
 
@@ -11,7 +13,7 @@ from ms_invoicer.utils import BreadCrumbs
 router = APIRouter()
 
 
-def get_default():
+def get_default() -> Dict[str, list[Dict[str, object]]]:
     return {
         "options": [
             {
@@ -23,7 +25,9 @@ def get_default():
     }
 
 
-def object_to_object(object) -> BreadCrumbs:
+def object_to_object(
+    object: Union[models.File, models.Invoice, Dict[str, Any]]
+) -> BreadCrumbs:
     if isinstance(object, models.File):
         return BreadCrumbs(
             value="Contratos",
@@ -48,7 +52,7 @@ def get_breadcrumbs(
     data: dict,
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, list[Dict[str, object]]]:
     current_path = data.get("current_path", None)
     default_result = {
         "options": [
