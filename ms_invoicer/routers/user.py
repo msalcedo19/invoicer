@@ -25,6 +25,11 @@ def authenticate(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> schemas.Token:
+    """Authenticate and return a bearer token.
+
+    Example form fields:
+    username=username&password=username123
+    """
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
         raise HTTPException(
@@ -49,6 +54,13 @@ def check_password(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
+    """Validate the current user's password.
+
+    Example JSON:
+    {
+      "user_password": "secret"
+    }
+    """
     user = authenticate_user(current_user.username, request.user_password, db)
     if not user:
         raise HTTPException(
@@ -60,6 +72,14 @@ def check_password(
 
 @router.post("/user", response_model=schemas.User)
 def create_user(model: dict, db: Session = Depends(get_db)) -> schemas.User:
+    """Create a user.
+
+    Example JSON:
+    {
+      "username": "username",
+      "password": "username123"
+    }
+    """
     user = crud.get_user_by_username(db=db, username=model["username"])
     current_date = get_current_date()
     if not user:
@@ -72,4 +92,9 @@ def create_user(model: dict, db: Session = Depends(get_db)) -> schemas.User:
 
 @router.get("/get_all_users", response_model=List[schemas.User])
 def get_all_user(db: Session = Depends(get_db)) -> List[schemas.User]:
+    """List all users.
+
+    Example request:
+    GET /get_all_users
+    """
     return crud.get_users(db=db)

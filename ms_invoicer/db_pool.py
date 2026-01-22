@@ -7,6 +7,7 @@ from ms_invoicer.sql_app.database import SessionLocal
 
 
 def get_db() -> Generator[Session, None, None]:
+    """Get db."""
     db = SessionLocal()
     try:
         yield db
@@ -16,6 +17,7 @@ def get_db() -> Generator[Session, None, None]:
 
 @contextmanager
 def get_db_context() -> ContextManager[Session]:
+    """Get db context."""
     db = SessionLocal()
     try:
         yield db

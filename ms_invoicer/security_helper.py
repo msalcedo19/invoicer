@@ -17,16 +17,19 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="authenticate/")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password."""
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
+    """Get password hash."""
     return pwd_context.hash(password)
 
 
 def create_access_token(
     data: Dict[str, Any], expires_delta: Union[timedelta, None] = None
 ) -> str:
+    """Create access token."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -38,6 +41,7 @@ def create_access_token(
 
 
 def get_payload_from_header(authorization: str = Header(...)) -> Dict[str, Any]:
+    """Get payload from header."""
     if not authorization:
         raise HTTPException(status_code=400, detail="Authorization header missing")
     # check that the Authorization header starts with Bearer
@@ -52,6 +56,7 @@ def get_payload_from_header(authorization: str = Header(...)) -> Dict[str, Any]:
 def get_current_user(
     token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> schemas.User:
+    """Get current user."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -72,6 +77,7 @@ def get_current_user(
 
 
 def authenticate_user(username: str, password: str, db: Session) -> Union[schemas.User, bool]:
+    """Authenticate user."""
     user = crud.get_user_by_username(db=db, username=username)
     if not user:
         return False

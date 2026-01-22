@@ -16,14 +16,17 @@ except ImportError:  # pypdf>=5 removed PdfMerger
 
     class PdfMerger:  # minimal adapter for existing usage
         def __init__(self) -> None:
+            """Initialize instance."""
             self._writer = PdfWriter()
 
         def append(self, fileobj: Union[str, bytes, os.PathLike[str], IO[bytes]]) -> None:
+            """Append."""
             reader = PdfReader(fileobj)
             for page in reader.pages:
                 self._writer.add_page(page)
 
         def write(self, fileobj: Union[str, bytes, os.PathLike[str], IO[bytes]]) -> None:
+            """Write."""
             if isinstance(fileobj, (str, bytes, os.PathLike)):
                 with open(os.fspath(fileobj), "wb") as handle:
                     self._writer.write(handle)
@@ -31,6 +34,7 @@ except ImportError:  # pypdf>=5 removed PdfMerger
                 self._writer.write(fileobj)
 
         def close(self) -> None:
+            """Close."""
             pass
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -52,6 +56,7 @@ log = logging.getLogger(__name__)
 
 
 async def build_pdf(event: PdfToProcessEvent) -> bool:
+    """Build pdf."""
     try:
         log.info(
             "Building PDF from invoice data",
@@ -82,6 +87,7 @@ async def build_pdf(event: PdfToProcessEvent) -> bool:
             with open(input_html_path) as fp:
                 soup = BeautifulSoup(fp, "html.parser")
 
+                # Expand the template table based on the number of services.
                 new_tag = soup.new_tag("div")
                 for index in range(0, len(event.file.services)):
                     new_tr_tag = soup.new_tag("tr")
@@ -185,6 +191,7 @@ async def build_pdf(event: PdfToProcessEvent) -> bool:
                     context["total_tax1"] = round(total_tax_1, 2)
                     context["total_tax2"] = round(total_tax_2, 2)
 
+                # Combine base, bill-to, services, and company info into template context.
                 context |= bill_to_data
                 context |= service_data
                 context |= top_info_data
@@ -205,6 +212,7 @@ async def build_pdf(event: PdfToProcessEvent) -> bool:
                 template = template_env.get_template(event.html_template_name)
                 output_text = template.render(context)
 
+                # Build the initial invoice PDF from the rendered HTML.
                 if not service_info:
                     searched_file = crud.get_file(
                         db=connection,
@@ -264,6 +272,7 @@ async def build_pdf(event: PdfToProcessEvent) -> bool:
 
 
 def generate_invoice(event: GenerateFinalPDFWithFile) -> bool:
+    """Generate invoice."""
     log.info(
         "Generating final invoice PDF",
         extra={
@@ -350,6 +359,7 @@ def generate_invoice(event: GenerateFinalPDFWithFile) -> bool:
             # Build and save the PDF document
             doc.build(elements)
 
+        # Merge the base invoice PDF with the tables PDF if present.
         merger = PdfMerger()
         for pdf in paths_to_check:
             merger.append(pdf)
@@ -396,13 +406,10 @@ def generate_invoice(event: GenerateFinalPDFWithFile) -> bool:
             },
         )
         raise
-    """finally:
-        remove_file(event.path_pdf_invoice)
-        if event.with_tables:
-            remove_file(event.path_pdf_tables)"""
 
 
 def generate_invoice_no_file(event: GenerateFinalPDFNoFile) -> bool:
+    """Generate invoice no file."""
     log.info(
         "Generating invoice PDF without xlsx",
         extra={
@@ -452,5 +459,3 @@ def generate_invoice_no_file(event: GenerateFinalPDFNoFile) -> bool:
             },
         )
         raise
-    #finally:
-    #    remove_file(event.path_pdf_invoice)

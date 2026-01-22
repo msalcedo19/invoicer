@@ -10,4 +10,5 @@ LOG = getLogger(__name__)
 
 @pytest.fixture()
 def test_client():
+    """Test client."""
     yield TestClient(api)

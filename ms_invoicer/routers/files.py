@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Form, UploadFile, status, HTTPException, Body
 from sqlalchemy.orm import Session
 
+from ms_invoicer.constants import LogEvent
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.file_helpers import (
     extract_pages,
@@ -35,6 +36,11 @@ def get_file(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.File:
+    """Get a file by id.
+
+    Example request:
+    GET /files/1
+    """
     return crud.get_file(db=db, model_id=file_id, current_user_id=current_user.id)
 
 
@@ -43,6 +49,11 @@ def get_files(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[schemas.File]:
+    """List files for the current user.
+
+    Example request:
+    GET /files
+    """
     return crud.get_files(db=db, current_user_id=current_user.id)
 
 
@@ -53,6 +64,13 @@ def patch_file(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[schemas.File]:
+    """Update a file record.
+
+    Example JSON:
+    {
+      "s3_pdf_url": "https://bucket.s3.amazonaws.com/invoice.pdf"
+    }
+    """
     update_dict = model_update.model_dump(exclude_unset=True)
     result = crud.patch_file(
         db=db,
@@ -72,6 +90,11 @@ def delete_file(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> int:
+    """Delete a file and its services.
+
+    Example request:
+    DELETE /files/1
+    """
     file = crud.get_file(db=db, model_id=model_id, current_user_id=current_user.id)
     crud.delete_services_by_file(
         db=db, model_id=file.id, current_user_id=current_user.id
@@ -91,6 +114,15 @@ async def generate_summary(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, str]:
+    """Generate a summary report for a customer and date range.
+
+    Example JSON:
+    {
+      "customer_id": "1",
+      "start_date": "2026-01-01",
+      "end_date": "2026-01-31"
+    }
+    """
     # Define the format of your date string
     date_format = "%Y-%m-%d"
 
@@ -114,6 +146,13 @@ async def get_pages(
     file: UploadFile = Form(),
     current_user: schemas.User = Depends(get_current_user)
 ) -> Dict[str, List[str]]:
+    """Extract sheet names from an uploaded xlsx.
+
+    Example response:
+    {
+      "pages": ["Sheet1", "Sheet2"]
+    }
+    """
     response = extract_pages(uploaded_file=file, current_user_id=current_user.id)
     return {"pages": response}
 
@@ -124,6 +163,18 @@ async def create_file(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.File:
+    """Create a file record.
+
+    Example JSON:
+    {
+      "s3_xlsx_url": "https://bucket.s3.amazonaws.com/file.xlsx",
+      "s3_pdf_url": null,
+      "pages_xlsx": "Sheet1",
+      "created": "2026-01-01T00:00:00",
+      "invoice_id": 1,
+      "bill_to_id": 1
+    }
+    """
     obj_dict = file.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_file(
@@ -145,6 +196,25 @@ async def generate_pdf(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.File:
+    """Generate an invoice PDF (multipart form).
+
+    Example JSON (fields inside the form):
+    invoice: {
+      "number_id": 1001,
+      "reason": "Monthly services",
+      "tax_1": 5.0,
+      "tax_2": 9.975,
+      "with_taxes": true,
+      "with_tables": true,
+      "created": "2026-01-01T00:00:00",
+      "updated": "2026-01-01T00:00:00",
+      "customer_id": 1
+    }
+    contracts: [
+      {"title": "Service A", "amount": 100, "currency": "CAD", "hours": 2, "price_unit": 50}
+    ]
+    pages: ["Sheet1"]
+    """
     result = None
     new_invoice = None
 
@@ -238,7 +308,7 @@ async def generate_pdf(
                 extra={
                     "customer_id": current_user.id,
                     "invoice_id": getattr(new_invoice, "id", None),
-                    "event": "create_invoice_from_file",
+                    "event": LogEvent.CREATE_INVOICE_FROM_FILE.value,
                 },
             )
             files = crud.get_files_by_invoice(

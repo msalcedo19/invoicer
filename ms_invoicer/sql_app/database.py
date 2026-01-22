@@ -12,6 +12,7 @@ from ms_invoicer.config import (
     POOL_TIMEOUT,
     URL_CONNECTION,
 )
+from ms_invoicer.constants import LogEvent
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ Base = declarative_base()
 
 
 def ensure_database_exists() -> None:
+    """Ensure database exists."""
     url = make_url(URL_CONNECTION)
     if not url.database:
         return
@@ -43,7 +45,10 @@ def ensure_database_exists() -> None:
             if not exists:
                 log.info(
                     "Creating database",
-                    extra={"db_name": url.database, "event": "ensure_database_exists"},
+                    extra={
+                        "db_name": url.database,
+                        "event": LogEvent.ENSURE_DATABASE_EXISTS.value,
+                    },
                 )
                 conn.execute(text(f'CREATE DATABASE "{url.database}"'))
     finally:
@@ -51,13 +56,14 @@ def ensure_database_exists() -> None:
 
 
 def init_db() -> None:
+    """Init db."""
     try:
         ensure_database_exists()
     except Exception:
         log.warning(
             "Skipping database creation",
             exc_info=True,
-            extra={"event": "init_db"},
+            extra={"event": LogEvent.INIT_DB.value},
         )
     from ms_invoicer.sql_app import models  # noqa: F401
 

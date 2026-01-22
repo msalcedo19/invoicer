@@ -12,10 +12,12 @@ CACHE_EXPIRY_SECONDS = 3600*24*7  # Example: 1 week
 
 
 def cache_key(key: str) -> str:
+    """Cache key."""
     return os.path.join(CACHE_DIR, f"{key}.json")
 
 
 def is_cache_valid(file_path: str) -> bool:
+    """Is cache valid."""
     if not os.path.exists(file_path):
         return False
     if time.time() - os.path.getmtime(file_path) > CACHE_EXPIRY_SECONDS:
@@ -24,17 +26,20 @@ def is_cache_valid(file_path: str) -> bool:
 
 
 def read_cache(file_path: str) -> BreadCrumbs:
+    """Read cache."""
     with open(file_path, 'r') as file:
         data_json = json.load(file)
         return BreadCrumbs(**json.loads(data_json))
 
 
 def write_cache(file_path: str, data: BreadCrumbs) -> None:
+    """Write cache."""
     with open(file_path, 'w') as file:
         json.dump(str(data), file)
 
 
 def get_cached_data(key: str, fetch_function: Callable[[], BreadCrumbs]) -> BreadCrumbs:
+    """Get cached data."""
     file_path = cache_key(key)
     if is_cache_valid(file_path):
         return read_cache(file_path)

@@ -15,6 +15,7 @@ class FilesToProcessEvent(Event):
         currency: str,
         pages: Optional[List[str]] = None
     ) -> None:
+        """Initialize instance."""
         self.xlsx_url = file_path
         self.file_id = file_id
         self.invoice_id = invoice_id
@@ -40,6 +41,7 @@ class PdfToProcessEvent(Event):
         with_file: bool = True,
         pages: Optional[List[str]] = None
     ):
+        """Initialize instance."""
         self.current_user_id = current_user_id
         self.invoice = invoice
         self.file = file
@@ -56,6 +58,7 @@ class GenerateFinalPDF(Event):
         filename: str,
         file_id: int,
     ):
+        """Initialize instance."""
         self.current_user_id = current_user_id
         self.filename = filename
         self.file_id = file_id
@@ -77,6 +80,7 @@ class GenerateFinalPDFWithFile(GenerateFinalPDF):
         with_tables: bool = True,
         pages: Optional[List[str]] = None
     ):
+        """Initialize instance."""
         super().__init__(current_user_id=current_user_id, filename=filename, file_id=file_id)
         self.path_pdf_tables = pdf_tables
         self.xlsx_url = xlsx_url
@@ -97,5 +101,6 @@ class GenerateFinalPDFNoFile(GenerateFinalPDF):
         filename: str,
         file_id: int,
     ):
+        """Initialize instance."""
         super().__init__(current_user_id=current_user_id, filename=filename, file_id=file_id)
         self.path_pdf_invoice = pdf_invoice

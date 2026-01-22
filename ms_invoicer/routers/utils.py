@@ -14,6 +14,7 @@ router = APIRouter()
 
 
 def get_default() -> Dict[str, list[Dict[str, object]]]:
+    """Get default."""
     return {
         "options": [
             {
@@ -28,6 +29,7 @@ def get_default() -> Dict[str, list[Dict[str, object]]]:
 def object_to_object(
     object: Union[models.File, models.Invoice, Dict[str, Any]]
 ) -> BreadCrumbs:
+    """Object to object."""
     if isinstance(object, models.File):
         return BreadCrumbs(
             value="Contratos",
@@ -53,6 +55,13 @@ def get_breadcrumbs(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, list[Dict[str, object]]]:
+    """Generate breadcrumbs for a UI path.
+
+    Example JSON:
+    {
+      "current_path": "/customer/1"
+    }
+    """
     current_path = data.get("current_path", None)
     default_result = {
         "options": [

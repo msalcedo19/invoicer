@@ -1,12 +1,14 @@
 import logging
 import time
-from typing import Any, Awaitable, Callable, List, Optional
+from contextlib import asynccontextmanager
+from typing import Any, Awaitable, Callable, AsyncIterator, List, Optional
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from ms_invoicer.config import LOG_LEVEL
+from ms_invoicer.constants import LogEvent
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.sql_app.database import init_db
 from ms_invoicer.event_handler import register_event_handlers
@@ -14,9 +16,17 @@ from ms_invoicer.routers import bill_to, customer, files, invoice, user, globals
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
 from ms_invoicer.utils import create_folders
-from ms_invoicer.no_upload_helper import populate_db
 
-api = FastAPI()
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Lifespan."""
+    init_db()
+    create_folders()
+    register_event_handlers()
+    yield
+
+
+api = FastAPI(lifespan=lifespan)
 api.add_middleware(
     CORSMiddleware,
     allow_credentials=False,
@@ -38,17 +48,11 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-@api.on_event("startup")
-def startup_tasks():
-    init_db()
-    create_folders()
-    register_event_handlers()
-
-
 @api.middleware("http")
 async def add_process_time_header(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
+    """Add process time header."""
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
@@ -59,7 +63,7 @@ async def add_process_time_header(
             "path": request.url.path,
             "status_code": response.status_code,
             "duration_ms": int(process_time * 1000),
-            "event": "request_timing",
+            "event": LogEvent.REQUEST_TIMING.value,
         },
     )
     return response
@@ -67,7 +71,13 @@ async def add_process_time_header(
 
 @api.get("/")
 def api_status() -> dict[str, str]:
-    """Returns a detailed status of the service including all dependencies"""
+    """Return service status.
+
+    Example response:
+    {
+      "status": "OK"
+    }
+    """
     # TODO: Should replace this with database connection / service checks
     return {"status": "OK"}
 
@@ -77,6 +87,11 @@ def get_services(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> List[schemas.Service]:
+    """List services for the current user.
+
+    Example request:
+    GET /service
+    """
     return crud.get_services(db=db, current_user_id=current_user.id)
 
 
@@ -86,6 +101,21 @@ def post_service(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> List[schemas.Service]:
+    """Create services in bulk.
+
+    Example JSON:
+    [
+      {
+        "title": "Service A",
+        "amount": 100,
+        "currency": "CAD",
+        "hours": 2,
+        "price_unit": 50,
+        "file_id": 1,
+        "invoice_id": 1
+      }
+    ]
+    """
     result = []
     for contract in contracts:
         obj_dict = contract.model_dump()
@@ -101,6 +131,11 @@ def get_topinfos(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[schemas.TopInfo]:
+    """Get top info records.
+
+    Example request:
+    GET /topinfo
+    """
     return crud.get_topinfos(db=db, current_user_id=current_user.id)
 
 
@@ -111,6 +146,16 @@ def update_topinfo(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[list[schemas.TopInfo]]:
+    """Update top info.
+
+    Example JSON:
+    {
+      "ti_from": "QUeBEC INC",
+      "addr": "123 Main St",
+      "phone": "+1 555-0100",
+      "email": "info@example.com"
+    }
+    """
     result = crud.patch_topinfo(
         db=db, model_id=model_id, current_user_id=current_user.id, update_dict=model
     )
@@ -125,4 +170,9 @@ def get_templates(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[schemas.Template]:
+    """List templates for the current user.
+
+    Example request:
+    GET /template
+    """
     return crud.get_templates(db=db, current_user_id=current_user.id)

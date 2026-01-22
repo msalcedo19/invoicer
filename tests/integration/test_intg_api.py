@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 
 def test_customer(test_client: TestClient):
+    """Test customer."""
     payload = {
         "name": "customer1",
         "tax1": 5,

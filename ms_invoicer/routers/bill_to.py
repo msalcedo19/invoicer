@@ -16,6 +16,16 @@ def create_bill_to(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.BillTo:
+    """Create a bill-to record.
+
+    Example JSON:
+    {
+      "to": "Acme LLC",
+      "addr": "123 Main St",
+      "phone": "+1 555-0100",
+      "email": "billing@acme.com"
+    }
+    """
     obj_dict = model.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_billto(db=db, model=schemas.BillToCreate(**obj_dict))
@@ -28,6 +38,11 @@ def get_billtos(
     limit: int = 100,
     db: Session = Depends(get_db),
 ) -> list[schemas.BillTo]:
+    """List bill-to records.
+
+    Example request:
+    GET /bill_to?skip=0&limit=100
+    """
     return crud.get_billtos(
         db=db, current_user_id=current_user.id, skip=skip, limit=limit
     )
@@ -40,6 +55,13 @@ def update_billTo(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[schemas.BillTo]:
+    """Update a bill-to record.
+
+    Example JSON:
+    {
+      "phone": "+1 555-0101"
+    }
+    """
     update_dict = model.model_dump(exclude_unset=True)
     result = crud.patch_billto(
         db=db,
@@ -61,4 +83,9 @@ def delete_bill_to(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> int:
+    """Soft-delete a bill-to record for the current user.
+
+    Example request:
+    DELETE /bill_to/123
+    """
     return crud.patch_billto(db=db, model_id=model_id, current_user_id=current_user.id, update_dict={"user_id": None})

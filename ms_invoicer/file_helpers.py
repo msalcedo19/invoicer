@@ -36,6 +36,7 @@ log = logging.getLogger(__name__)
 
 
 def extract_pages(uploaded_file: UploadFile, current_user_id: int) -> List[str]:
+    """Extract pages."""
     log.info(
         "Extracting xlsx pages",
         extra={"customer_id": current_user_id, "event": "extract_pages"},
@@ -69,6 +70,7 @@ async def process_file(
     col_letter: str = "F",
     pages: Union[List[str], None] = None,
 ) -> Tuple[Union[schemas.File, None], Union[str, None]]:
+    """Process file."""
     if file is None:
         return None, None
     pages = pages or []
@@ -149,6 +151,7 @@ async def process_file(
 
 
 async def extract_data(event: FilesToProcessEvent) -> bool:
+    """Extract data."""
     log.info(
         "Extracting invoice data from xlsx",
         extra={
@@ -171,11 +174,13 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                 sheet: Cell = wb_obj[sheet_name]
                 col_letter = find_letter(sheet)
 
+                # Identify row ranges for each contract section.
                 ranges = find_ranges(sheet)
                 invoice_update = False
                 for range_of in ranges:
                     (minrowinfo, maxrowinfo, minrow, maxrow) = range_of
                     if not invoice_update:
+                        # Parse invoice date from the summary row in the sheet.
                         parsed_date = str(sheet["{}{}".format("A", maxrow - 1)].value)
                         date_formats = [
                             "%d/%m/%Y %H:%M:%S",
@@ -214,6 +219,7 @@ async def extract_data(event: FilesToProcessEvent) -> bool:
                         hour: float = sheet["{}{}".format(col_letter, col)].value
                         hours += float(round(hour, 2))
 
+                    # Derive amount and price_unit depending on the sheet data.
                     price_unit = contract_dict.get("price_unit", None)
                     amount = 0
                     if not price_unit:
@@ -267,6 +273,7 @@ async def process_pdf(
     xlsx_local_path: str,
     pages: Union[List[str], None] = None,
 ) -> schemas.File:
+    """Process pdf."""
     pages = pages or []
     log.info(
         "Processing PDF creation",
@@ -372,6 +379,7 @@ async def generate_summary_by_date(
     start_date: datetime,
     end_date: datetime,
 ) -> str:
+    """Generate summary by date."""
     log.info(
         "Generating summary by date",
         extra={
@@ -402,12 +410,14 @@ async def generate_summary_by_date(
         def __init__(
             self, filename: str, file_path: str, invoice_id: int, pages_xlsx: str
         ) -> None:
+            """Initialize instance."""
             self.filename = filename
             self.file_path = file_path
             self.invoice_id = invoice_id
             self.pages_xlsx = pages_xlsx
 
         def __str__(self) -> str:
+            """Return display string."""
             return "file_path: {} - invoice_id: {}".format(
                 self.file_path, self.invoice_id, self.pages_xlsx
             )
@@ -457,6 +467,7 @@ async def generate_summary_by_date(
             xlsx_file = Path(path.file_path)
             wb_obj = openpyxl.load_workbook(xlsx_file, data_only=True)
 
+            # Track the mapping between input and output sheet names.
             if path.file_path not in pair_sheet_names:
                 pair_sheet_names[path.file_path] = []
             pages_xlsx: List[str] = []
@@ -507,6 +518,7 @@ async def generate_summary_by_date(
                         period_extracted = True
 
                     # Values
+                    # Copy input sheet columns into the summary template layout.
                     for col in range(minrow, maxrow):
                         input_date_value = input_sheet["{}{}".format("A", col)].value
                         new_sheet_wb["{}{}".format("A", col)].value = input_date_value

@@ -7,7 +7,7 @@ from ms_invoicer.config import S3_BUCKET_NAME
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
-from ms_invoicer.utils import delete_file_from_s3
+from ms_invoicer.utils import delete_file_from_s3, s3_key_from_url
 
 router = APIRouter()
 
@@ -17,6 +17,11 @@ async def get_customers(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.TotalAndCustomer:
+    """List customers with invoice counts.
+
+    Example request:
+    GET /customer
+    """
     start = 0
     return schemas.TotalAndCustomer(
         total=crud.get_total_customers(db=db, current_user_id=current_user.id),
@@ -32,6 +37,11 @@ def get_customer(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[schemas.CustomerFull]:
+    """Get a customer by id.
+
+    Example request:
+    GET /customer/1
+    """
     return crud.get_customer(db=db, model_id=model_id, current_user_id=current_user.id)
 
 
@@ -41,6 +51,11 @@ def get_customer_invoices(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.TotalAndInvoices:
+    """List invoices for a customer.
+
+    Example request:
+    GET /customer/1/invoices
+    """
     start = 0
     result =  schemas.TotalAndInvoices(
         total=crud.get_total_invoices_by_customer(
@@ -63,6 +78,13 @@ def patch_customer(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[schemas.Customer]:
+    """Update a customer.
+
+    Example JSON:
+    {
+      "name": "Acme LLC"
+    }
+    """
     update_dict = model_update.model_dump(exclude_unset=True)
     result = crud.patch_customer(
         db=db,
@@ -84,10 +106,15 @@ def delete_customer(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> int:
+    """Delete a customer and related records.
+
+    Example request:
+    DELETE /customer/1
+    """
     invoices = crud.get_invoices_by_customer(
         db=db, model_id=customer_id, current_user_id=current_user.id, skip=0,
     )
-    files_to_delete = []
+    files_to_delete: List[str] = []
     for invoice in invoices:
         files = crud.get_files_by_invoice(
             db=db, model_id=invoice.id, current_user_id=current_user.id
@@ -96,12 +123,10 @@ def delete_customer(
             crud.delete_services_by_file(
                 db=db, model_id=file.id, current_user_id=current_user.id
             )
-            if file.s3_pdf_url:
-                file_name = file.s3_pdf_url.split("/")[3]
-                files_to_delete.append(file_name)
-            if file.s3_xlsx_url:
-                file_name = file.s3_pdf_url.split("/")[3]
-                files_to_delete.append(file_name)
+            for url in (file.s3_pdf_url, file.s3_xlsx_url):
+                key = s3_key_from_url(url)
+                if key:
+                    files_to_delete.append(key)
         crud.delete_files_by_invoice(
             db=db, model_id=invoice.id, current_user_id=current_user.id
         )
@@ -120,6 +145,13 @@ def post_customer(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.Customer:
+    """Create a customer.
+
+    Example JSON:
+    {
+      "name": "Acme LLC"
+    }
+    """
     obj_dict = customer.model_dump()
     obj_dict["user_id"] = current_user.id
     return crud.create_customer(db=db, model=schemas.CustomerCreate(**obj_dict))
@@ -132,6 +164,11 @@ async def get_all_customers(
     limit: int = 100,
     db: Session = Depends(get_db),
 ) -> list[schemas.Customer]:
+    """List all customers (admin use).
+
+    Example request:
+    GET /get_all_customer?skip=0&limit=100
+    """
     return crud.get_all_customers(db=db, skip=skip, limit=limit)
 
 
@@ -142,6 +179,11 @@ def patch_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, int]:
+    """Reassign customer data to a different user.
+
+    Example request:
+    PATCH /update_customer_data?customer_id=1&new_user_id=2
+    """
     model_update = {"user_id": new_user_id}
 
     result = crud.patch_all_customer_by_user_id(

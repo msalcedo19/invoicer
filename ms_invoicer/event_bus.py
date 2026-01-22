@@ -14,6 +14,7 @@ bus = Bus(event_use_weakref=False)
 
 
 def _event_type(clazz: Type) -> str:
+    """Event type."""
     return f"{clazz.__module__}.{clazz.__name__}"
 
 
@@ -23,6 +24,7 @@ class Event:
     """
 
     def event_type(self) -> str:
+        """Event type."""
         return _event_type(self.__class__)
 
 
@@ -30,10 +32,12 @@ EventHandlerType = Callable[..., Coroutine[Any, Event, Any]]
 
 
 def _ensure_async(handler: Callable[..., Any]) -> EventHandlerType:
+    """Ensure async."""
     if asyncio.iscoroutinefunction(handler):
         return cast(EventHandlerType, handler)
 
     async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+        """Wrapper."""
         result = handler(*args, **kwargs)
         if inspect.isawaitable(result):
             return await result

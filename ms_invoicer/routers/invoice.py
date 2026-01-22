@@ -7,7 +7,7 @@ from ms_invoicer.config import S3_BUCKET_NAME
 from ms_invoicer.db_pool import get_db
 from ms_invoicer.security_helper import get_current_user
 from ms_invoicer.sql_app import crud, schemas
-from ms_invoicer.utils import delete_file_from_s3
+from ms_invoicer.utils import delete_file_from_s3, s3_key_from_url
 
 router = APIRouter()
 
@@ -18,6 +18,21 @@ def post_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> schemas.InvoiceLite:
+    """Create an invoice.
+
+    Example JSON:
+    {
+      "number_id": 1001,
+      "reason": "Monthly services",
+      "tax_1": 5.0,
+      "tax_2": 9.975,
+      "with_taxes": true,
+      "with_tables": true,
+      "created": "2026-01-01T00:00:00",
+      "updated": "2026-01-01T00:00:00",
+      "customer_id": 1
+    }
+    """
     result = crud.get_invoices_by_number_id(
         db=db,
         number_id=invoice.number_id,
@@ -41,6 +56,14 @@ def patch_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[schemas.Invoice]:
+    """Update an invoice.
+
+    Example JSON:
+    {
+      "reason": "Updated reason",
+      "with_tables": false
+    }
+    """
     update_dict = model_update.model_dump(exclude_unset=True)
     if "number_id" in update_dict and not isinstance(
         update_dict.get("number_id", None), int
@@ -69,6 +92,11 @@ def get_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[schemas.Invoice]:
+    """Get an invoice by id.
+
+    Example request:
+    GET /invoice/1
+    """
     return crud.get_invoice(db=db, model_id=invoice_id, current_user_id=current_user.id)
 
 
@@ -77,6 +105,11 @@ def get_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> List[schemas.Invoice]:
+    """List invoices for the current user.
+
+    Example request:
+    GET /invoice
+    """
     return crud.get_invoices(db=db, current_user_id=current_user.id)
 
 
@@ -86,20 +119,23 @@ def delete_invoice(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> int:
+    """Delete an invoice and related files/services.
+
+    Example request:
+    DELETE /invoice/1
+    """
     files = crud.get_files_by_invoice(
         db=db, model_id=model_id, current_user_id=current_user.id
     )
-    files_to_delete = []
+    files_to_delete: List[str] = []
     for file in files:
         crud.delete_services_by_file(
             db=db, model_id=file.id, current_user_id=current_user.id
         )
-        if file.s3_pdf_url:
-            file_name = file.s3_pdf_url.split("/")[3]
-            files_to_delete.append(file_name)
-        if file.s3_xlsx_url:
-            file_name = file.s3_xlsx_url.split("/")[3]
-            files_to_delete.append(file_name)
+        for url in (file.s3_pdf_url, file.s3_xlsx_url):
+            key = s3_key_from_url(url)
+            if key:
+                files_to_delete.append(key)
     crud.delete_files_by_invoice(
         db=db, model_id=model_id, current_user_id=current_user.id
     )

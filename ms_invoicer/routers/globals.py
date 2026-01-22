@@ -18,6 +18,11 @@ def get_global(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[schemas.Global]:
+    """Get a global setting by identifier.
+
+    Example request:
+    GET /global/1
+    """
     return crud.get_global(
         db=db, identifier=identifier, current_user_id=current_user.id
     )
@@ -28,6 +33,11 @@ def get_globals(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[schemas.Global]:
+    """List global settings for the current user.
+
+    Example request:
+    GET /global
+    """
     return crud.get_globals(db=db, current_user_id=current_user.id)
 
 
@@ -38,6 +48,14 @@ def update_global(
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[schemas.Global]:
+    """Update a global setting.
+
+    Example JSON:
+    {
+      "name": "TPS 726688351 RT 0001",
+      "value": "5"
+    }
+    """
     model["updated"] = get_current_date()
     global_var = crud.get_global_by_id(
         db=db, model_id=model_id, current_user_id=current_user.id

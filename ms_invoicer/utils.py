@@ -1,5 +1,6 @@
 import json
 from typing import Optional, Tuple, Union
+from urllib.parse import urlparse
 import logging
 import os
 import boto3
@@ -12,6 +13,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.cell.cell import Cell
 
 from ms_invoicer.config import S3_ACCESS_KEY, S3_SECRET_ACCESS_KEY
+from ms_invoicer.constants import LogEvent
 
 log = logging.getLogger(__name__)
 
@@ -34,11 +36,13 @@ MONTH_NAMES_FRENCH = {
 
 class BreadCrumbs:
     def __init__(self, href: str, value: str, required_id: Optional[int] = None) -> None:
+        """Initialize instance."""
         self.href = href
         self.value = value
         self.required_id = required_id
     
     def __repr__(self) -> str:
+        """Return representation string."""
         return json.dumps({"href": self.href, "value": self.value, "required_id": self.required_id})
 
 
@@ -51,22 +55,24 @@ def check_dates(base_date: datetime, date1: time, date2: time = None) -> datetim
 
 
 def create_folders() -> None:
+    """Create folders."""
     folder_names = ["temp", "temp/xlsx", "temp/pdf", "temp/cache"]
     for folder_name in folder_names:
         if not os.path.exists(folder_name):
             log.info(
                 "Created folder",
-                extra={"folder_path": folder_name, "event": "create_folder"},
+                extra={"folder_path": folder_name, "event": LogEvent.CREATE_FOLDER.value},
             )
             os.mkdir(folder_name)
         else:
             log.debug(
                 "Folder already exists",
-                extra={"folder_path": folder_name, "event": "create_folder"},
+                extra={"folder_path": folder_name, "event": LogEvent.CREATE_FOLDER.value},
             )
 
 
 def save_file(file_path: str, file: UploadFile) -> None:
+    """Save file."""
     if os.path.exists(file_path):
         os.remove(file_path)
     with open(file_path, "wb") as output_file:
@@ -74,12 +80,13 @@ def save_file(file_path: str, file: UploadFile) -> None:
 
 
 def remove_file(file_path: str) -> None:
+    """Remove file."""
     if os.path.isfile(file_path):
         os.remove(file_path)
     else:
         log.warning(
             "File not found for removal",
-            extra={"file_path": file_path, "event": "remove_file"},
+            extra={"file_path": file_path, "event": LogEvent.REMOVE_FILE.value},
         )
 
 
@@ -134,6 +141,7 @@ def find_ranges(sheet: Worksheet) -> List[Tuple[int, int, int, int]]:
 
 
 def find_letter(sheet: Worksheet) -> Optional[str]:
+    """Find letter."""
     result = None
     for row in sheet.iter_rows(max_col=10, max_row=200):
         row_data: Cell = row[0]
@@ -213,7 +221,7 @@ def upload_file(
                 "file_path": file_path,
                 "object_name": object_name,
                 "is_pdf": is_pdf,
-                "event": "upload_file",
+                "event": LogEvent.UPLOAD_FILE.value,
             },
         )
         raise Exception("Failure uploading file")
@@ -224,6 +232,7 @@ def download_file_from_s3(
     path_to_save: str,
     bucket: str = "invoicer-dev-01",
 ) -> None:
+    """Download file from s3."""
     try:
         session: boto3.Session = boto3.session.Session()
         s3 = session.client(
@@ -243,7 +252,7 @@ def download_file_from_s3(
                 "bucket": bucket,
                 "file_path_s3": file_path_s3,
                 "path_to_save": path_to_save,
-                "event": "download_file",
+                "event": LogEvent.DOWNLOAD_FILE.value,
             },
         )
         raise Exception("Failure downloading file")
@@ -252,6 +261,7 @@ def download_file_from_s3(
 def delete_file_from_s3(
     file_names: Union[str, list[str]], bucket_name: str = "invoicer-dev-01"
 ) -> None:
+    """Delete file from s3."""
     try:
         # Create a session using your AWS credentials
         s3_client = boto3.client(
@@ -270,21 +280,35 @@ def delete_file_from_s3(
             extra={
                 "bucket": bucket_name,
                 "file_names": file_names,
-                "event": "delete_file",
+                "event": LogEvent.DELETE_FILE.value,
             },
         )
         raise Exception("Failure deleting file")
 
 
 def extract_and_get_month_name(date: datetime) -> Optional[str]:
+    """Extract and get month name."""
     month = date.month
     if month in MONTH_NAMES_FRENCH:
         return MONTH_NAMES_FRENCH[month]
     return None
 
 
+def s3_key_from_url(url: Optional[str]) -> Optional[str]:
+    """S3 key from url."""
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.path:
+        return parsed.path.lstrip("/")
+    if "amazonaws.com/" in url:
+        return url.split("amazonaws.com/")[1]
+    return None
+
+
 def get_current_date() -> datetime:
     # Create a timezone object for Eastern Standard Time
+    """Get current date."""
     est = pytz.timezone('US/Eastern')
     # Get the current time in UTC and convert it to EST
     current_time_in_est = datetime.now(pytz.utc).astimezone(est)
