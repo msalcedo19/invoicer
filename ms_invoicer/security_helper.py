@@ -12,7 +12,8 @@ from ms_invoicer.db_pool import get_db
 from ms_invoicer.sql_app import crud, schemas
 
 # Use PBKDF2 to avoid bcrypt backend issues under Python 3.12.
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# Support both schemes to handle legacy bcrypt hashes
+pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="authenticate/")
 
 
