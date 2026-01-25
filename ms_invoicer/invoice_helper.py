@@ -71,8 +71,13 @@ async def build_pdf(event: PdfToProcessEvent) -> bool:
             input_html_path: str = os.path.join(
                 base, "templates/base/{}".format(event.html_template_name)
             )
+            # Write modified template to temp directory instead of overwriting original
+            temp_templates_dir = os.path.join(base, "temp/templates")
+            os.makedirs(temp_templates_dir, exist_ok=True)
+            # Use unique filename to avoid conflicts with concurrent requests
+            unique_template_name = f"{event.invoice.id}_{event.file.id}_{uuid4()}_{event.html_template_name}"
             output_html_path: str = os.path.join(
-                base, "templates/{}".format(event.html_template_name)
+                temp_templates_dir, unique_template_name
             )
             event.file = crud.get_file(
                 db=connection,
@@ -206,11 +211,25 @@ async def build_pdf(event: PdfToProcessEvent) -> bool:
                         "event": "build_pdf",
                     },
                 )
-                template_loader = jinja2.FileSystemLoader(os.path.join(base, "templates"))
+                # Load template from temp directory where modified template was written
+                template_loader = jinja2.FileSystemLoader(temp_templates_dir)
                 template_env = jinja2.Environment(loader=template_loader)
 
-                template = template_env.get_template(event.html_template_name)
+                template = template_env.get_template(unique_template_name)
                 output_text = template.render(context)
+                
+                # Clean up the temporary template file after rendering
+                try:
+                    os.remove(output_html_path)
+                except Exception as cleanup_error:
+                    log.warning(
+                        "Failed to clean up temporary template file",
+                        extra={
+                            "template_path": output_html_path,
+                            "error": str(cleanup_error),
+                            "event": "build_pdf",
+                        },
+                    )
 
                 # Build the initial invoice PDF from the rendered HTML.
                 if not service_info:
